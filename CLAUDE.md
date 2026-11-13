@@ -36,6 +36,9 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 
 - The NestJS API (`apps/api`) is the only public backend and the only owner of the database schema (Prisma).
   Python (`apps/ai`) never writes business tables: results go back to the API.
+- `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
+  It only does AI work (normalization, rule filter, model inference). Any data it needs comes from the API
+  over HTTP or in the job payload.
 - API: controllers stay thin, logic lives in services, infrastructure clients live in `src/infrastructure`.
   Throw `AppException` subclasses, never raw errors.
 - AI: shared code in `core/` and `modules/`. `core` never imports `server` or `worker`, and `server` and `worker`

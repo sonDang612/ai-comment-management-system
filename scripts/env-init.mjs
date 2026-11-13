@@ -3,7 +3,7 @@
  * Creates missing env files from their templates. Never overwrites an existing file.
  *
  *   node scripts/env-init.mjs              host dev files: apps/api/.env, apps/ai/.env, apps/web/.env.local
- *   node scripts/env-init.mjs development  Docker files:   <each app>/.env.development + infrastructure/docker/.env.development
+ *   node scripts/env-init.mjs development  Docker files:   <each app>/.env.development
  *
  * Templates hold local-dev values only: replace every secret before using staging/production.
  */
@@ -22,7 +22,6 @@ if (env !== undefined && !ENVIRONMENTS.includes(env)) {
 /** [template, target] pairs, relative to the repo root. */
 const pairs = env
   ? [
-      ["infrastructure/docker/.env.example", `infrastructure/docker/.env.${env}`],
       ["apps/api/.env.docker.example", `apps/api/.env.${env}`],
       ["apps/ai/.env.docker.example", `apps/ai/.env.${env}`],
       ["apps/web/.env.docker.example", `apps/web/.env.${env}`],

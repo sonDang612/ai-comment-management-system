@@ -5,11 +5,11 @@
 #   npm run docker -- development up -d postgres redis   (postgres + redis only, for host dev)
 #
 # Configuration comes from env files, never from the repository root:
-#   infrastructure/docker/.env.<env>   published host ports (this file's ${...})
 #   apps/api/.env.<env>                api + migrate containers (env_file); POSTGRES_* for postgres (${...})
 #   apps/ai/.env.<env>                 ai-server + ai-worker containers (env_file)
 #   apps/web/.env.<env>                web: NEXT_PUBLIC_* build args (${...}) + container env
 # Only values that are fixed for every environment are written here.
+# Host ports default to 5432/6379/4000/3000; override with POSTGRES_PORT, REDIS_PORT, API_PORT, WEB_PORT.
 #
 #   web (Next.js) --HTTP--> api (NestJS) --HTTP--> ai-server (apps/ai, FastAPI, internal)
 #                            |  \--BullMQ (Redis)--> ai-worker (apps/ai, BullMQ consumer)

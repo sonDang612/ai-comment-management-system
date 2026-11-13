@@ -71,7 +71,7 @@ Its `turbo.json` makes `dev` start the server and the worker together (`dev` + `
 ## Quick start: everything in Docker
 
 ```bash
-npm run env:init -- development   # apps/*/.env.development + infrastructure/docker/.env.development
+npm run env:init -- development   # apps/*/.env.development
 npm run docker:up                 # = npm run docker -- development up -d --build
 ```
 
@@ -92,7 +92,7 @@ To stop the stack, run `npm run docker:down`. Data volumes are kept; remove them
 
 ```bash
 npm run env:init                                      # apps/api/.env, apps/ai/.env, apps/web/.env.local
-npm run env:init -- development                       # apps/api/.env.development (postgres credentials) + infrastructure/docker/.env.development (ports)
+npm run env:init -- development                       # apps/api/.env.development (postgres credentials)
 npm install
 uv sync                                               # Python workspace -> .venv
 
@@ -167,7 +167,6 @@ There is **no `.env` at the repository root**. Each project keeps its own files,
 | `apps/api/.env.<env>`                  | `api` + `migrate`, Postgres credentials   | `.env.docker.example`    |
 | `apps/ai/.env.<env>`                   | `ai-server` + `ai-worker` containers      | `.env.docker.example`    |
 | `apps/web/.env.<env>`                  | `web` image build args (`NEXT_PUBLIC_*`)  | `.env.docker.example`    |
-| `infrastructure/docker/.env.<env>`     | Published host ports                      | `.env.example`           |
 
 `<env>` is `development`, `staging` or `production`. `npm run docker -- <env> …` (`scripts/docker.mjs`) does three things:
 
@@ -246,7 +245,7 @@ locale-prefixed URLs: `/zh-CN/...`, `/en/...`.
 
 ## Troubleshooting
 
-- **Port already in use**: change `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT` or `WEB_PORT` in `infrastructure/docker/.env.<env>`.
+- **Port already in use**: change `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT` or `WEB_PORT` as an environment variable (`POSTGRES_PORT=5433 npm run docker:up`) or in `apps/api/.env.<env>`.
   Two environments running at once need different ports.
 - **Web shows "API unreachable"**: check `NEXT_PUBLIC_API_URL`, and that the web origin is listed in `CORS_ORIGINS`.
   For the Docker image, rebuild after changing it (it is a build arg).

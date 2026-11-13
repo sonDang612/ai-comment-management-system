@@ -1,8 +1,10 @@
 "use client";
 
-import { Languages } from "lucide-react";
+import { Button, Modal } from "antd";
+import { Check, Languages } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { cn } from "cn";
 import { LOCALE_LABELS, LOCALES, localizePath, useI18n } from "@/i18n";
 
@@ -10,25 +12,50 @@ import { LOCALE_LABELS, LOCALES, localizePath, useI18n } from "@/i18n";
 export function LanguageSwitcher({ className }: { className?: string }) {
   const { locale, dict } = useI18n();
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+  const close = () => setIsOpen(false);
 
   return (
-    <nav aria-label={dict.common.language} className={cn("flex items-center gap-1 text-sm", className)}>
-      <Languages className="size-4 text-muted-foreground" aria-hidden />
-      {LOCALES.map((target) => (
-        <Link
-          key={target}
-          href={localizePath(pathname, target)}
-          hrefLang={target}
-          lang={target}
-          aria-current={target === locale ? "true" : undefined}
-          className={cn(
-            "rounded-md px-2 py-1 transition-colors hover:bg-muted",
-            target === locale ? "font-medium text-foreground" : "text-muted-foreground",
-          )}
-        >
-          {LOCALE_LABELS[target]}
-        </Link>
-      ))}
-    </nav>
+    <>
+      <Button
+        type="text"
+        className={className}
+        icon={<Languages className="size-4" aria-hidden />}
+        aria-label={dict.common.language}
+        aria-haspopup="dialog"
+        onClick={() => setIsOpen(true)}
+      />
+      <Modal
+        title={dict.common.language}
+        open={isOpen}
+        onCancel={close}
+        footer={null}
+        width={360}
+        centered
+      >
+        <nav aria-label={dict.common.language} className="flex flex-col gap-1 pt-2">
+          {LOCALES.map((target) => {
+            const isCurrent = target === locale;
+            return (
+              <Link
+                key={target}
+                href={localizePath(pathname, target)}
+                hrefLang={target}
+                lang={target}
+                aria-current={isCurrent ? "true" : undefined}
+                onClick={close}
+                className={cn(
+                  "flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted",
+                  isCurrent ? "font-medium text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {LOCALE_LABELS[target]}
+                {isCurrent && <Check className="size-4" aria-hidden />}
+              </Link>
+            );
+          })}
+        </nav>
+      </Modal>
+    </>
   );
 }

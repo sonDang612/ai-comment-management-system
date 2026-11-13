@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { MainNav } from "@/components/main-nav";
 import { I18nProvider, LOCALES } from "@/i18n";
 import { getDictionary, getLocale } from "@/i18n/server";
 import { AppProviders } from "@/providers";
@@ -40,12 +42,15 @@ export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
     <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <I18nProvider locale={locale} dict={dict}>
-          <AppProviders>
-            <header className="flex justify-end p-4">
-              <LanguageSwitcher />
-            </header>
-            {children}
-          </AppProviders>
+          <Suspense fallback={null}>
+            <AppProviders>
+              <header className="flex items-center justify-between gap-4 p-4">
+                <MainNav />
+                <LanguageSwitcher />
+              </header>
+              {children}
+            </AppProviders>
+          </Suspense>
         </I18nProvider>
       </body>
     </html>

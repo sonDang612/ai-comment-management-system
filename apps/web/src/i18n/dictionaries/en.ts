@@ -11,6 +11,11 @@ const en: Dictionary = {
     backToHome: "Back to home",
     tryAgain: "Try again",
   },
+  nav: {
+    label: "Main navigation",
+    comments: "Comments",
+    status: "API status",
+  },
   errorPage: {
     title: "Something went wrong",
     description: "An unexpected error occurred. Please try again.",

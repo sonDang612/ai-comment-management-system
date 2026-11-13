@@ -6,3 +6,6 @@ allowBuilds:
   prisma: true
   "@prisma/engines": true
   msgpackr-extract: false
+
+minimumReleaseAgeExclude:
+  - bullmq@6.7.6

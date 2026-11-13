@@ -24,7 +24,7 @@ export function useNavItems(): { items: NavItem[]; current: NavItem | undefined 
   return { items, current: items.find((item) => pathname.startsWith(item.href)) };
 }
 
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav() {
   const { dict } = useI18n();
   const { items, current } = useNavItems();
 
@@ -32,9 +32,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     key: href,
     icon: <Icon className="size-4" aria-hidden />,
     label: (
-      <Link href={href} onClick={onNavigate}>
-        {label}
-      </Link>
+      <Link href={href}>{label}</Link>
     ),
   }));
 

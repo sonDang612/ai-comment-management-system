@@ -35,19 +35,17 @@ export interface CommentListResponse {
   items: CommentDto[];
 }
 
-export interface AiModerationRequest {
+export const QUESTION_LABEL = '需人工回复';
+
+export interface AiCommentAnalysisRequest {
   comment_id: string;
   content: string;
 }
 
-export interface AiModerationResult {
-  comment_id: string;
-  decision: CommentStatus;
-  category: string | null;
-  violation_type: string | null;
-  labels: string[];
+export interface AiCommentAnalysis {
+  is_valid: boolean;
+  is_question: boolean;
   confidence: number;
   reason: string;
-  decided_by: DecidedBy;
   model_version: string;
 }

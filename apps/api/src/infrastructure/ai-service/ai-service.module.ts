@@ -1,10 +1,10 @@
 import { Global, Module } from '@nestjs/common';
-import { AiModerationClient } from './ai-moderation.client.js';
+import { AiAnalysisClient } from './ai-analysis.client.js';
 import { AiServiceClient } from './ai-service.client.js';
 
 @Global()
 @Module({
-  providers: [AiServiceClient, AiModerationClient],
-  exports: [AiServiceClient, AiModerationClient],
+  providers: [AiServiceClient, AiAnalysisClient],
+  exports: [AiServiceClient, AiAnalysisClient],
 })
 export class AiServiceModule {}

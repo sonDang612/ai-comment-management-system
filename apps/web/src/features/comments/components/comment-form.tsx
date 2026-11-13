@@ -61,6 +61,7 @@ export function CreateCommentModal() {
         autoSize={{ minRows: 4, maxRows: 10 }}
         showCount
         autoFocus
+        className="!mb-8"
       />
     </Modal>
   );

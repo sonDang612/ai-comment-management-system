@@ -1,8 +1,25 @@
-import { COMMENT_CONTENT_MAX_LENGTH, type CreateCommentRequest } from '@acms/shared';
+import {
+  COMMENT_CONTENT_MAX_LENGTH,
+  CommentStatus,
+  type CreateCommentRequest,
+  DEFAULT_COMMENT_PAGE_SIZE,
+  MAX_COMMENT_PAGE_SIZE,
+} from '@acms/shared';
 import { ValidationException } from '../../common/errors/app.exception.js';
 
-const DEFAULT_LIST_LIMIT = 50;
-const MAX_LIST_LIMIT = 100;
+export interface CommentListParams {
+  page: number;
+  pageSize: number;
+  status: CommentStatus | undefined;
+}
+
+export interface RawCommentListQuery {
+  page?: string;
+  page_size?: string;
+  status?: string;
+}
+
+const COMMENT_STATUSES = new Set<string>(Object.values(CommentStatus));
 
 export function parseCreateCommentRequest(body: unknown): CreateCommentRequest {
   const content =
@@ -22,13 +39,32 @@ export function parseCreateCommentRequest(body: unknown): CreateCommentRequest {
   return { content: trimmed };
 }
 
-export function parseListLimit(raw: string | undefined): number {
-  if (raw === undefined || raw === '') return DEFAULT_LIST_LIMIT;
-  const limit = Number(raw);
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {
-    throw new ValidationException(`limit must be an integer between 1 and ${MAX_LIST_LIMIT}`, [
-      { field: 'limit', rule: 'range', min: 1, max: MAX_LIST_LIMIT },
+function parsePositiveInt(field: string, raw: string | undefined, fallback: number, max?: number): number {
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || (max !== undefined && value > max)) {
+    const range = max === undefined ? 'a positive integer' : `an integer between 1 and ${max}`;
+    throw new ValidationException(`${field} must be ${range}`, [
+      { field, rule: 'range', min: 1, ...(max === undefined ? {} : { max }) },
     ]);
   }
-  return limit;
+  return value;
+}
+
+function parseStatus(raw: string | undefined): CommentStatus | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  if (!COMMENT_STATUSES.has(raw)) {
+    throw new ValidationException(`status must be one of: ${[...COMMENT_STATUSES].join(', ')}`, [
+      { field: 'status', rule: 'enum', allowed: [...COMMENT_STATUSES] },
+    ]);
+  }
+  return raw as CommentStatus;
+}
+
+export function parseCommentListQuery(query: RawCommentListQuery): CommentListParams {
+  return {
+    page: parsePositiveInt('page', query.page, 1),
+    pageSize: parsePositiveInt('page_size', query.page_size, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE),
+    status: parseStatus(query.status),
+  };
 }

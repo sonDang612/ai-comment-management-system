@@ -31,8 +31,21 @@ export interface CommentDto {
   updated_at: string;
 }
 
+export const COMMENT_PAGE_SIZES = [20, 50, 100] as const;
+export const DEFAULT_COMMENT_PAGE_SIZE = 20;
+export const MAX_COMMENT_PAGE_SIZE = 100;
+
+export interface CommentListQuery {
+  page?: number;
+  page_size?: number;
+  status?: CommentStatus;
+}
+
 export interface CommentListResponse {
   items: CommentDto[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export const QUESTION_LABEL = '需人工回复';

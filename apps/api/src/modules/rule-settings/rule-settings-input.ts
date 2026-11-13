@@ -1,11 +1,9 @@
 import {
   isValidDomain,
-  KeywordAction,
-  KeywordMatchMode,
   keywordIdentity,
   normalizeDomain,
+  normalizeKeyword,
   RULE_SETTINGS_LIMITS,
-  type RestrictedKeyword,
   type RuleSettings,
 } from '@acms/shared';
 import { ValidationException } from '../../common/errors/app.exception.js';
@@ -17,9 +15,6 @@ interface ValidationIssue {
 }
 
 type UnknownRecord = Record<string, unknown>;
-
-const MATCH_MODES = new Set<string>(Object.values(KeywordMatchMode));
-const KEYWORD_ACTIONS = new Set<string>(Object.values(KeywordAction));
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,46 +61,33 @@ class RuleSettingsParser {
     return domains;
   }
 
-  keywords(value: unknown): RestrictedKeyword[] {
+  keywords(value: unknown, field: string): string[] {
     if (!Array.isArray(value)) {
-      this.issues.push({ field: 'keywords', rule: 'array' });
+      this.issues.push({ field, rule: 'array' });
       return [];
     }
     if (value.length > RULE_SETTINGS_LIMITS.maxKeywords) {
-      this.issues.push({ field: 'keywords', rule: 'max_items', max: RULE_SETTINGS_LIMITS.maxKeywords });
+      this.issues.push({ field, rule: 'max_items', max: RULE_SETTINGS_LIMITS.maxKeywords });
     }
+    const keywords: string[] = [];
     const seen = new Set<string>();
-    return value.map((item, index) => {
-      const field = `keywords[${index}]`;
-      const raw = this.record(item, field);
-      const keyword = typeof raw['keyword'] === 'string' ? raw['keyword'].trim() : '';
+    value.forEach((item, index) => {
+      const keyword = typeof item === 'string' ? normalizeKeyword(item) : '';
       if (keyword === '' || keyword.length > RULE_SETTINGS_LIMITS.keywordMaxLength) {
         this.issues.push({
-          field: `${field}.keyword`,
+          field: `${field}[${index}]`,
           rule: 'length',
           min: 1,
           max: RULE_SETTINGS_LIMITS.keywordMaxLength,
         });
       } else if (seen.has(keywordIdentity(keyword))) {
-        this.issues.push({ field: `${field}.keyword`, rule: 'unique' });
+        this.issues.push({ field: `${field}[${index}]`, rule: 'unique' });
+      } else {
+        seen.add(keywordIdentity(keyword));
+        keywords.push(keyword);
       }
-      seen.add(keywordIdentity(keyword));
-      const matchMode = raw['match_mode'];
-      if (typeof matchMode !== 'string' || !MATCH_MODES.has(matchMode)) {
-        this.issues.push({ field: `${field}.match_mode`, rule: 'enum', allowed: [...MATCH_MODES] });
-      }
-      const action = raw['action'];
-      if (typeof action !== 'string' || !KEYWORD_ACTIONS.has(action)) {
-        this.issues.push({ field: `${field}.action`, rule: 'enum', allowed: [...KEYWORD_ACTIONS] });
-      }
-      return {
-        id: typeof raw['id'] === 'string' ? raw['id'] : '',
-        keyword,
-        match_mode: matchMode as KeywordMatchMode,
-        action: action as KeywordAction,
-        enabled: this.boolean(raw['enabled'], `${field}.enabled`),
-      };
     });
+    return keywords;
   }
 }
 
@@ -127,7 +109,7 @@ export function parseRuleSettings(body: unknown): RuleSettings {
         RULE_SETTINGS_LIMITS.maxRepeatedChars,
       ),
     },
-    keywords: parser.keywords(root['keywords']),
+    keywords: parser.keywords(root['keywords'], 'keywords'),
     links: {
       domain_whitelist: parser.domains(links['domain_whitelist'], 'links.domain_whitelist'),
     },

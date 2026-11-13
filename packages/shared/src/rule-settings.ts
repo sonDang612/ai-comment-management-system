@@ -1,27 +1,5 @@
 import { COMMENT_CONTENT_MAX_LENGTH } from './comments.js';
 
-export const KeywordMatchMode = {
-  EXACT: 'exact',
-  CONTAINS: 'contains',
-} as const;
-export type KeywordMatchMode = (typeof KeywordMatchMode)[keyof typeof KeywordMatchMode];
-
-export const KeywordAction = {
-  DISABLED: 'disabled',
-  PENDING: 'pending',
-} as const;
-export type KeywordAction = (typeof KeywordAction)[keyof typeof KeywordAction];
-
-export interface RestrictedKeyword {
-  id: string;
-  keyword: string;
-  match_mode: KeywordMatchMode;
-  action: KeywordAction;
-  enabled: boolean;
-}
-
-export type RestrictedKeywordDraft = Omit<RestrictedKeyword, 'id'>;
-
 export interface CommentValidationSettings {
   min_length: number;
   max_length: number;
@@ -36,7 +14,7 @@ export interface LinkSettings {
 
 export interface RuleSettings {
   validation: CommentValidationSettings;
-  keywords: RestrictedKeyword[];
+  keywords: string[];
   links: LinkSettings;
 }
 
@@ -66,13 +44,10 @@ export function isValidDomain(domain: string): boolean {
   return domain.length <= RULE_SETTINGS_LIMITS.domainMaxLength && DOMAIN_PATTERN.test(domain);
 }
 
-export function keywordIdentity(keyword: string): string {
-  return keyword.trim().toLowerCase();
+export function normalizeKeyword(input: string): string {
+  return input.trim().replace(/\s+/g, ' ');
 }
 
-export const NEW_RESTRICTED_KEYWORD_DEFAULTS: RestrictedKeywordDraft = {
-  keyword: '',
-  match_mode: KeywordMatchMode.CONTAINS,
-  action: KeywordAction.DISABLED,
-  enabled: true,
-};
+export function keywordIdentity(keyword: string): string {
+  return normalizeKeyword(keyword).toLowerCase();
+}

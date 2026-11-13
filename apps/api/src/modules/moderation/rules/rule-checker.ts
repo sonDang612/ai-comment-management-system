@@ -1,18 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import type { CommentValidationSettings, LinkSettings, RuleSettings } from '@acms/shared';
 import {
-  type CommentValidationSettings,
-  KeywordMatchMode,
-  type LinkSettings,
-  type RestrictedKeyword,
-  type RuleSettings,
-} from '@acms/shared';
-import {
+  containsKeyword,
   contentLength,
   domainMatches,
   extractDomains,
   isEmojiOnly,
   longestRepeatedRun,
-  matchesKeyword,
   normalizeText,
 } from './text-checks.js';
 
@@ -76,17 +70,13 @@ export class RuleChecker {
     return violations;
   }
 
-  private checkKeywords(content: string, keywords: RestrictedKeyword[]): RuleViolation[] {
+  private checkKeywords(content: string, keywords: string[]): RuleViolation[] {
     const normalizedContent = normalizeText(content);
     return keywords
-      .filter(
-        (keyword) =>
-          keyword.enabled &&
-          matchesKeyword(normalizedContent, keyword.keyword, keyword.match_mode === KeywordMatchMode.EXACT),
-      )
+      .filter((keyword) => containsKeyword(normalizedContent, keyword))
       .map((keyword) => ({
         code: RuleViolationCode.RESTRICTED_KEYWORD,
-        reason: `命中限制关键词“${keyword.keyword}”`,
+        reason: `命中限制关键词“${keyword}”`,
       }));
   }
 

@@ -4,7 +4,6 @@ const EMOJI_PICTOGRAPHIC_PATTERN = /\p{Extended_Pictographic}/u;
 const EMOJI_PART_PATTERN =
   /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|[‍︎️⃣]|[\u{E0020}-\u{E007F}])+$/u;
 const WHITESPACE_PATTERN = /\s/u;
-const REGEX_SPECIAL_CHARS = /[.*+?^${}()|[\]\\]/g;
 
 export function normalizeText(text: string): string {
   return text.normalize('NFKC').toLowerCase();
@@ -38,12 +37,9 @@ export function longestRepeatedRun(content: string): { char: string; run: number
   return best;
 }
 
-export function matchesKeyword(normalizedContent: string, keyword: string, exact: boolean): boolean {
+export function containsKeyword(normalizedContent: string, keyword: string): boolean {
   const normalizedKeyword = normalizeText(keyword.trim());
-  if (normalizedKeyword === '') return false;
-  if (!exact) return normalizedContent.includes(normalizedKeyword);
-  const escaped = normalizedKeyword.replace(REGEX_SPECIAL_CHARS, '\\$&');
-  return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'u').test(normalizedContent);
+  return normalizedKeyword !== '' && normalizedContent.includes(normalizedKeyword);
 }
 
 export function normalizeHost(host: string): string {

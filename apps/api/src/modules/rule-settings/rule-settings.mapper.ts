@@ -1,25 +1,11 @@
-import type { KeywordAction, RestrictedKeyword, RuleSettings } from '@acms/shared';
-import type {
-  RestrictedKeyword as RestrictedKeywordRow,
-  RuleSettings as RuleSettingsRow,
-} from '../../generated/prisma/client.js';
+import type { RuleSettings } from '@acms/shared';
+import type { RuleSettings as RuleSettingsRow } from '../../generated/prisma/client.js';
 import { DEFAULT_RULE_SETTINGS } from './rule-settings.defaults.js';
 
 export type RuleSettingsData = Omit<RuleSettingsRow, 'id' | 'createdAt' | 'updatedAt'>;
 
-export function toRestrictedKeywordDto(row: RestrictedKeywordRow): RestrictedKeyword {
-  return {
-    id: row.id,
-    keyword: row.keyword,
-    match_mode: row.matchMode,
-    action: row.action as KeywordAction,
-    enabled: row.enabled,
-  };
-}
-
-export function toRuleSettingsDto(row: RuleSettingsRow | null, keywords: RestrictedKeywordRow[]): RuleSettings {
-  const keywordDtos = keywords.map(toRestrictedKeywordDto);
-  if (row === null) return { ...structuredClone(DEFAULT_RULE_SETTINGS), keywords: keywordDtos };
+export function toRuleSettingsDto(row: RuleSettingsRow | null): RuleSettings {
+  if (row === null) return structuredClone(DEFAULT_RULE_SETTINGS);
   return {
     validation: {
       min_length: row.minLength,
@@ -28,7 +14,7 @@ export function toRuleSettingsDto(row: RuleSettingsRow | null, keywords: Restric
       allow_emoji_only: row.allowEmojiOnly,
       max_repeated_chars: row.maxRepeatedChars,
     },
-    keywords: keywordDtos,
+    keywords: row.restrictedKeywords,
     links: {
       domain_whitelist: row.domainWhitelist,
     },
@@ -42,6 +28,7 @@ export function toRuleSettingsData(settings: RuleSettings): RuleSettingsData {
     allowEmpty: settings.validation.allow_empty,
     allowEmojiOnly: settings.validation.allow_emoji_only,
     maxRepeatedChars: settings.validation.max_repeated_chars,
+    restrictedKeywords: settings.keywords,
     domainWhitelist: settings.links.domain_whitelist,
   };
 }

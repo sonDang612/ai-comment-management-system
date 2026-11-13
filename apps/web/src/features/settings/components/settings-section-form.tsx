@@ -17,7 +17,6 @@ interface SettingsSectionFormProps<K extends SectionKey> {
   title: string;
   description: string;
   children: ReactNode;
-  onReset?: () => void;
 }
 
 function sectionValues<K extends SectionKey>(section: K, settings: RuleSettings): SectionValues<K> {
@@ -30,7 +29,6 @@ export function SettingsSectionForm<K extends SectionKey>({
   title,
   description,
   children,
-  onReset,
 }: SettingsSectionFormProps<K>) {
   const { dict } = useI18n();
   const t = dict.settings;
@@ -57,7 +55,6 @@ export function SettingsSectionForm<K extends SectionKey>({
 
   const cancel = () => {
     form.resetFields();
-    onReset?.();
     setIsDirty(false);
   };
 

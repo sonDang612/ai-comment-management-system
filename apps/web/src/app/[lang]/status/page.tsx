@@ -9,8 +9,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function StatusPage() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+    <div className="flex justify-center py-6">
       <HealthStatus />
-    </main>
+    </div>
   );
 }

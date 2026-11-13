@@ -1,19 +1,22 @@
 "use client";
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "@acms/shared";
-import { App, Button, Card, Form, Input } from "antd";
+import { App, Input, Modal } from "antd";
 import { format, useI18n } from "@/i18n";
 import { apiErrorMessage } from "@/lib/api";
 import { useCreateComment } from "../api";
 import { useCommentsUiStore } from "../store";
 
-export function CommentForm() {
+export function CreateCommentModal() {
   const { dict } = useI18n();
   const t = dict.comments;
   const { message } = App.useApp();
+  const isOpen = useCommentsUiStore((state) => state.isCreateOpen);
+  const closeCreate = useCommentsUiStore((state) => state.closeCreate);
   const draft = useCommentsUiStore((state) => state.draft);
   const setDraft = useCommentsUiStore((state) => state.setDraft);
   const clearDraft = useCommentsUiStore((state) => state.clearDraft);
+  const showFirstPage = useCommentsUiStore((state) => state.showFirstPage);
   const createComment = useCreateComment();
   const content = draft.trim();
 
@@ -24,6 +27,8 @@ export function CommentForm() {
       {
         onSuccess: (comment) => {
           clearDraft();
+          closeCreate();
+          showFirstPage();
           message.success(format(t.submitted, { status: t.status[comment.status] }));
         },
         onError: (error) => {
@@ -34,27 +39,29 @@ export function CommentForm() {
   };
 
   return (
-    <Card title={t.formTitle}>
-      <Form layout="vertical" onFinish={submit}>
-        <Form.Item label={t.contentLabel}>
-          <Input.TextArea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder={t.contentPlaceholder}
-            maxLength={COMMENT_CONTENT_MAX_LENGTH}
-            autoSize={{ minRows: 3, maxRows: 8 }}
-            showCount
-          />
-        </Form.Item>
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={createComment.isPending}
-          disabled={!content}
-        >
-          {t.submit}
-        </Button>
-      </Form>
-    </Card>
+    <Modal
+      title={t.formTitle}
+      open={isOpen}
+      onCancel={closeCreate}
+      onOk={submit}
+      okText={t.submit}
+      cancelText={t.cancel}
+      okButtonProps={{ disabled: !content, loading: createComment.isPending }}
+      destroyOnHidden
+    >
+      <label className="mb-2 block text-sm" htmlFor="comment-content">
+        {t.contentLabel}
+      </label>
+      <Input.TextArea
+        id="comment-content"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        placeholder={t.contentPlaceholder}
+        maxLength={COMMENT_CONTENT_MAX_LENGTH}
+        autoSize={{ minRows: 4, maxRows: 10 }}
+        showCount
+        autoFocus
+      />
+    </Modal>
   );
 }

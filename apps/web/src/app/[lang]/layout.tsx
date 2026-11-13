@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
-import { LanguageSwitcher } from "@/components/language-switcher";
-import { MainNav } from "@/components/main-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { APPLY_COLOR_SCHEME_SCRIPT } from "@/config/theme";
 import { I18nProvider, LOCALES } from "@/i18n";
 import { getDictionary, getLocale } from "@/i18n/server";
@@ -53,14 +51,7 @@ export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
         <I18nProvider locale={locale} dict={dict}>
           <Suspense fallback={null}>
             <AppProviders>
-              <header className="sticky top-0 z-50 flex items-center justify-between gap-4 border-b bg-background/80 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <MainNav />
-                <div className="flex items-center gap-1">
-                  <ThemeToggle />
-                  <LanguageSwitcher />
-                </div>
-              </header>
-              {children}
+              <DashboardShell>{children}</DashboardShell>
             </AppProviders>
           </Suspense>
         </I18nProvider>

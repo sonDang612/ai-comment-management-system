@@ -10,6 +10,7 @@ const zhCN = {
   },
   common: {
     appName: "AI 评论审核",
+    appShortName: "AICM",
     language: "语言",
     backToHome: "返回首页",
     tryAgain: "重试",
@@ -18,6 +19,8 @@ const zhCN = {
     label: "主导航",
     comments: "评论管理",
     status: "API 状态",
+    open: "打开导航菜单",
+    close: "关闭导航菜单",
   },
   theme: {
     switchToDark: "切换到深色模式",
@@ -48,12 +51,15 @@ const zhCN = {
     formTitle: "发表评论",
     contentLabel: "评论内容",
     contentPlaceholder: "请输入评论内容…",
+    create: "发表评论",
     submit: "提交",
+    cancel: "取消",
     submitted: "评论已提交，审核结果：{status}",
-    listTitle: "评论列表",
     refresh: "刷新",
     empty: "暂无评论",
+    filterLabel: "按状态筛选",
     filterAll: "全部",
+    total: "共 {total} 条",
     loadFailed: "评论加载失败：{message}",
     columns: {
       content: "内容",

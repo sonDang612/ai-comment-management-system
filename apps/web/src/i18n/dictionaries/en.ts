@@ -7,6 +7,7 @@ const en: Dictionary = {
   },
   common: {
     appName: "AI Comment Moderation",
+    appShortName: "AICM",
     language: "Language",
     backToHome: "Back to home",
     tryAgain: "Try again",
@@ -15,6 +16,8 @@ const en: Dictionary = {
     label: "Main navigation",
     comments: "Comments",
     status: "API status",
+    open: "Open navigation menu",
+    close: "Close navigation menu",
   },
   theme: {
     switchToDark: "Switch to dark mode",
@@ -44,12 +47,15 @@ const en: Dictionary = {
     formTitle: "Post a comment",
     contentLabel: "Comment",
     contentPlaceholder: "Write a comment…",
+    create: "Post a comment",
     submit: "Submit",
+    cancel: "Cancel",
     submitted: "Comment submitted. Moderation result: {status}",
-    listTitle: "Comments",
     refresh: "Refresh",
     empty: "No comments yet",
+    filterLabel: "Filter by status",
     filterAll: "All",
+    total: "{total} in total",
     loadFailed: "Failed to load comments: {message}",
     columns: {
       content: "Content",

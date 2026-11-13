@@ -2,26 +2,39 @@ import {
   API_V1_PREFIX,
   type CommentDto,
   type CommentListResponse,
+  type CommentStatus,
   type CreateCommentRequest,
 } from "@acms/shared";
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
 
 const COMMENTS_PATH = `${API_V1_PREFIX}/comments`;
 
+export interface CommentListParams {
+  page: number;
+  pageSize: number;
+  status?: CommentStatus;
+}
+
 export const commentKeys = {
   all: ["comments"] as const,
-  list: () => [...commentKeys.all, "list"] as const,
+  lists: () => [...commentKeys.all, "list"] as const,
+  list: (params: CommentListParams) => [...commentKeys.lists(), params] as const,
 };
 
-export const commentListQueryOptions = queryOptions({
-  queryKey: commentKeys.list(),
-  queryFn: () => apiClient.get<CommentListResponse>(COMMENTS_PATH),
-  select: (response) => response.items,
-});
+export function commentListQueryOptions(params: CommentListParams) {
+  return queryOptions({
+    queryKey: commentKeys.list(params),
+    queryFn: () =>
+      apiClient.get<CommentListResponse>(COMMENTS_PATH, {
+        query: { page: params.page, page_size: params.pageSize, status: params.status },
+      }),
+    placeholderData: keepPreviousData,
+  });
+}
 
-export function useComments() {
-  return useQuery(commentListQueryOptions);
+export function useComments(params: CommentListParams) {
+  return useQuery(commentListQueryOptions(params));
 }
 
 export function useCreateComment() {
@@ -29,6 +42,6 @@ export function useCreateComment() {
   return useMutation({
     mutationFn: (request: CreateCommentRequest) =>
       apiClient.post<CommentDto>(COMMENTS_PATH, request),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: commentKeys.all }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: commentKeys.lists() }),
   });
 }

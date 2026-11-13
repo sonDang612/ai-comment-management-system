@@ -36,7 +36,6 @@ const textSkeleton = <Skeleton.Input active size="small" block />;
 const tagSkeleton = <Skeleton.Button active size="small" />;
 
 const VALIDITY_FILTERS: CommentValidityFilter[] = ["all", "valid", "invalid"];
-const CONFIDENCE_FRACTION_DIGITS = 2;
 
 export function CommentTable() {
   const { dict, locale } = useI18n();
@@ -99,13 +98,21 @@ export function CommentTable() {
         ),
     },
     {
-      key: "confidence",
-      title: t.columns.confidence,
-      width: 130,
+      key: "is_question",
+      title: t.columns.isQuestion,
+      width: 120,
       render: (_, row) =>
-        isSkeletonRow(row)
-          ? textSkeleton
-          : (row.confidence?.toFixed(CONFIDENCE_FRACTION_DIGITS) ?? "-"),
+        isSkeletonRow(row) ? (
+          tagSkeleton
+        ) : (
+          <CheckResultTag
+            value={row.is_question}
+            trueLabel={t.yes}
+            falseLabel={t.no}
+            trueColor="processing"
+            falseColor="default"
+          />
+        ),
     },
     {
       key: "created_at",

@@ -19,8 +19,3 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["acms_ai"]
-
-# `uv run pytest` from the repo root runs the Python suite (as does `npm run test`).
-[tool.pytest.ini_options]
-testpaths = ["apps/ai/tests"]
-addopts = "-ra --import-mode=importlib"

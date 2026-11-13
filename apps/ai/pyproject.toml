@@ -17,7 +17,3 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "acms_ai"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-ra --import-mode=importlib"

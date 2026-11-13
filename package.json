@@ -11,7 +11,6 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
     "db:migrate": "npm run db:migrate --workspace @acms/api",
     "env:init": "node scripts/env-init.mjs",
     "docker": "node scripts/docker.mjs",

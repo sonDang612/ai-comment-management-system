@@ -14,7 +14,7 @@ web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP + X-Internal-Token─�
 | Layer          | Stack                                                                                    |
 | -------------- | ---------------------------------------------------------------------------------------- |
 | Frontend       | Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, Zustand, TanStack Query |
-| Main API       | NestJS 12 (ESM), Prisma 7 (`@prisma/adapter-pg`), BullMQ producer, Vitest                |
+| Main API       | NestJS 12 (ESM), Prisma 7 (`@prisma/adapter-pg`), BullMQ producer                        |
 | AI server      | `apps/ai` → `acms_ai.server`: Python 3.12, FastAPI, Pydantic v2. Internal, called by the API |
 | AI worker      | `apps/ai` → `acms_ai.worker`: BullMQ (Python) consumer of the `ai-jobs` queue            |
 | Database       | PostgreSQL 17 (tables in the `app` schema), migrations by Prisma Migrate                 |
@@ -42,7 +42,7 @@ Python never writes business tables directly: results go back to the API.
 │   │       ├── common/           # request context, AppException, global filter, logger
 │   │       ├── config/env.ts     # validated env schema
 │   │       ├── infrastructure/   # prisma, redis, queue (BullMQ), ai-service (HTTP client)
-│   │       ├── modules/<x>/      # feature modules (controller / service / *.spec.ts)
+│   │       ├── modules/<x>/      # feature modules (controller / service)
 │   │       └── generated/prisma/ # generated client (git-ignored)
 │   └── ai/                       # Python: one package (acms_ai), two entrypoints
 │       ├── src/acms_ai/
@@ -50,7 +50,6 @@ Python never writes business tables directly: results go back to the API.
 │       │   ├── modules/<x>/      # shared feature logic (service.py), plus router.py/schemas.py
 │       │   ├── server/           # entrypoint 1: FastAPI app, middleware, auth, error envelope
 │       │   └── worker/           # entrypoint 2: BullMQ consumer, processor, jobs/, healthcheck
-│       └── tests/{server,worker}/
 ├── packages/
 │   └── shared/                   # TS contracts: error envelope, health types, queue + job names
 ├── infrastructure/docker/        # api / python / web Dockerfiles + docker-compose.yml
@@ -59,7 +58,7 @@ Python never writes business tables directly: results go back to the API.
 └── pyproject.toml / uv.lock      # uv workspace (apps/ai)
 ```
 
-`apps/ai` also has a small `package.json` so Turborepo can run its `dev` / `lint` / `test` tasks (they call `uv`).
+`apps/ai` also has a small `package.json` so Turborepo can run its `dev` / `lint` tasks (they call `uv`).
 Its `turbo.json` makes `dev` start the server and the worker together (`dev` + `dev:worker`).
 
 ## Prerequisites
@@ -115,8 +114,6 @@ for both AI processes. One AI process alone: `npm run dev --workspace @acms/ai` 
 | `npm run build`                      | Build shared, api and web                                    |
 | `npm run lint`                       | ESLint (web), oxlint (api), Ruff (Python)                    |
 | `npm run typecheck`                  | `tsc` for web, api and shared                                |
-| `npm run test`                       | Vitest (api), pytest (apps/ai)                               |
-| `uv run pytest`                      | Every Python suite, from the repo root                       |
 | `npm run db:migrate`                 | Apply pending migrations                                     |
 | `npm run env:init [-- <env>]`        | Create missing env files from the templates                  |
 | `npm run docker:up` / `docker:down`  | Full development stack in Docker                             |

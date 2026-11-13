@@ -7,7 +7,7 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 ## While implementing code
 
 - Do not write code comments or docstrings. Use clear names instead. Keep the existing comments.
-- Do not write or update tests, unless the user asks for them.
+- The repo has no tests. Do not write, update or run tests, even when asked to "fix" failing ones: ask first.
 - Do not run Docker or Docker Compose (`npm run docker*`, `docker ...`) on your own. Run them only when the user
   explicitly asks you to in the current request.
 - Do not install or add packages (`npm install`, `npm i`, `pip install`, `uv add`, `uv sync`). If a new dependency

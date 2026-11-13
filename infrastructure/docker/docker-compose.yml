@@ -1,0 +1,152 @@
+# Docker stack, one per environment (development | staging | production).
+# Run it through the wrapper, which picks the env files and the project name:
+#   npm run docker -- <env> <compose args>      e.g. npm run docker -- production up -d --build
+#   npm run docker:up / docker:down              (= development)
+#   npm run infra:up                             (development postgres + redis only, for host dev)
+#
+# Configuration comes from env files, never from the repository root:
+#   infrastructure/docker/.env.<env>   postgres credentials + published host ports (this file's ${...})
+#   apps/api/.env.<env>                API container (env_file)
+#   apps/ai/.env.<env>                 ai-server + ai-worker containers (env_file)
+#   apps/web/.env.<env>                web: NEXT_PUBLIC_* build args (${...}) + container env
+# Only values that are fixed for every environment are written here.
+#
+#   web (Next.js) --HTTP--> api (NestJS) --HTTP--> ai-server (apps/ai, FastAPI, internal)
+#                            |  \--BullMQ (Redis)--> ai-worker (apps/ai, BullMQ consumer)
+#                            \--Prisma--> postgres
+
+# One isolated project per environment: separate containers, networks and data volumes.
+name: acms-${APP_ENV:?run through scripts/docker.mjs (npm run docker -- <env> ...)}
+
+x-common-env: &common-env
+  # Set by scripts/docker.mjs; overrides whatever the env file says.
+  APP_ENV: ${APP_ENV}
+  # Project time zone is UTC+8 (packages/shared/src/time.ts). Apps also enforce it in code.
+  TZ: Asia/Shanghai
+
+x-api-build: &api-build
+  context: ../..
+  dockerfile: infrastructure/docker/api.Dockerfile
+
+# apps/ai: one Python package, one image build, two processes (targets share every layer).
+x-ai-build: &ai-build
+  context: ../..
+  dockerfile: infrastructure/docker/python.Dockerfile
+
+x-ai-service: &ai-service
+  restart: unless-stopped
+  env_file: ../../apps/ai/.env.${APP_ENV}
+  environment: *common-env
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in infrastructure/docker/.env.<env>}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in infrastructure/docker/.env.<env>}
+      POSTGRES_DB: ${POSTGRES_DB:?set in infrastructure/docker/.env.<env>}
+      # Server logs and the default session zone (psql, `now()` display) in UTC+8.
+      # `timestamptz` values are stored as UTC either way; Prisma always sends UTC.
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # noeviction: BullMQ requires that Redis never evicts queue keys.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: applies pending Prisma migrations, then exits. The API waits for it.
+  migrate:
+    build:
+      <<: *api-build
+      target: migrate
+    image: acms-api-migrate:${APP_ENV}
+    env_file: ../../apps/api/.env.${APP_ENV}
+    environment: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      <<: *api-build
+      target: api
+    image: acms-api:${APP_ENV}
+    restart: unless-stopped
+    env_file: ../../apps/api/.env.${APP_ENV}
+    environment:
+      <<: *common-env
+      # Fixed by the image: production build, listening on 4000 inside the container.
+      NODE_ENV: production
+      PORT: 4000
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      ai-server:
+        condition: service_healthy
+
+  # Internal only: not published to the host. Only the API calls it.
+  ai-server:
+    <<: *ai-service
+    build:
+      <<: *ai-build
+      target: ai-server
+    image: acms-ai-server:${APP_ENV}
+
+  ai-worker:
+    <<: *ai-service
+    build:
+      <<: *ai-build
+      target: ai-worker
+    image: acms-ai-worker:${APP_ENV}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        # Inlined into the browser bundle at build time (from apps/web/.env.<env>). Not `:?`:
+        # interpolation covers every service, and infra-only runs have no web env file.
+        # scripts/docker.mjs refuses to start web without it.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    image: acms-web:${APP_ENV}
+    restart: unless-stopped
+    env_file: ../../apps/web/.env.${APP_ENV}
+    environment: *common-env
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:

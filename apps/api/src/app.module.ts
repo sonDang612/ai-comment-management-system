@@ -1,0 +1,31 @@
+import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
+import { RequestContextMiddleware } from './common/context/request-context.middleware.js';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
+import { validateEnv } from './config/env.js';
+import { AiServiceModule } from './infrastructure/ai-service/ai-service.module.js';
+import { PrismaModule } from './infrastructure/prisma/prisma.module.js';
+import { QueueModule } from './infrastructure/queue/queue.module.js';
+import { RedisModule } from './infrastructure/redis/redis.module.js';
+import { HealthModule } from './modules/health/health.module.js';
+
+@Module({
+  imports: [
+    // Global, validated configuration (apps/api/.env locally; real env vars take precedence).
+    ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
+    // Infrastructure (global providers)
+    PrismaModule,
+    RedisModule,
+    QueueModule,
+    AiServiceModule,
+    // Feature modules
+    HealthModule,
+  ],
+  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestContextMiddleware).forRoutes('*path');
+  }
+}

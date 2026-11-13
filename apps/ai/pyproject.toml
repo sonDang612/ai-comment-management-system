@@ -1,0 +1,23 @@
+[project]
+name = "acms-ai"
+version = "0.1.0"
+description = "AI Comment Moderation - AI package: internal HTTP server (FastAPI) + queue worker (BullMQ)"
+requires-python = ">=3.12"
+dependencies = [
+  "bullmq>=3.6",
+  "fastapi>=0.115",
+  "pydantic>=2.10",
+  "pydantic-settings>=2.7",
+  "uvicorn[standard]>=0.32",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "acms_ai"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --import-mode=importlib"

@@ -1,0 +1,34 @@
+{
+  "name": "ai-comment-management-system",
+  "private": true,
+  "packageManager": "npm@12.0.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:migrate": "npm run db:migrate --workspace @acms/api",
+    "env:init": "node scripts/env-init.mjs",
+    "docker": "node scripts/docker.mjs",
+    "docker:up": "node scripts/docker.mjs development up -d --build",
+    "docker:down": "node scripts/docker.mjs development down",
+    "infra:up": "node scripts/docker.mjs development up -d postgres redis",
+    "infra:down": "node scripts/docker.mjs development stop postgres redis"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.11"
+  },
+  "allowScripts": {
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true,
+    "msgpackr-extract": false
+  }
+}

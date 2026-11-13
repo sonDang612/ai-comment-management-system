@@ -1,0 +1,21 @@
+// Central business schema, owned by the NestJS API.
+//
+// Rules:
+//   * Every schema change goes through a migration: `npm run db:migrate:create -- --name <change>`.
+//   * Never edit a migration that has been applied anywhere; add a new one.
+//   * Never use `prisma db push` against shared/staging/production databases.
+//   * Every DateTime column is `@db.Timestamptz(3)` (an instant, stored as UTC). The project
+//     time zone (UTC+8, @acms/shared `APP_TIME_ZONE`) is only for calendar logic and display.
+//
+// Tables live in the Postgres schema named by `?schema=` in DATABASE_URL (default: `app`).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Models are added together with the business features that need them.

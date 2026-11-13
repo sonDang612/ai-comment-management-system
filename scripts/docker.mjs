@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+/**
+ * Docker Compose wrapper: one stack per environment, configured by per-app env files.
+ *
+ *   node scripts/docker.mjs <development|staging|production> <compose args...>
+ *   npm run docker -- production up -d --build
+ *
+ * It sets APP_ENV (compose project `acms-<env>`, env_file paths, image tags) and passes
+ * `infrastructure/docker/.env.<env>` and `apps/web/.env.<env>` to Compose for interpolation.
+ * It fails early, with the command to fix it, when a needed env file is missing.
+ */
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
+
+const ENVIRONMENTS = ["development", "staging", "production"];
+const ROOT = path.resolve(import.meta.dirname, "..");
+const COMPOSE_FILE = "infrastructure/docker/docker-compose.yml";
+
+/** Env file each service needs, besides the infra file (always required). */
+const SERVICE_ENV_FILES = {
+  migrate: "apps/api",
+  api: "apps/api",
+  "ai-server": "apps/ai",
+  "ai-worker": "apps/ai",
+  web: "apps/web",
+};
+// Compose subcommands that create or start containers (and so need their env files).
+const STARTING_COMMANDS = new Set(["up", "create", "run", "build", "start", "restart"]);
+
+const [env, ...composeArgs] = process.argv.slice(2);
+if (!ENVIRONMENTS.includes(env) || composeArgs.length === 0) {
+  console.error(`Usage: node scripts/docker.mjs <${ENVIRONMENTS.join("|")}> <compose args...>`);
+  process.exit(2);
+}
+
+const infraFile = `infrastructure/docker/.env.${env}`;
+const webFile = `apps/web/.env.${env}`;
+const missing = new Set();
+if (!existsSync(path.join(ROOT, infraFile))) missing.add("infrastructure/docker");
+
+// Positional args after the subcommand are service names; none means every service.
+const command = composeArgs.find((arg) => !arg.startsWith("-"));
+if (STARTING_COMMANDS.has(command)) {
+  const named = composeArgs.slice(composeArgs.indexOf(command) + 1).filter((a) => !a.startsWith("-"));
+  const services = named.length > 0 ? named : Object.keys(SERVICE_ENV_FILES);
+  for (const service of services) {
+    const dir = SERVICE_ENV_FILES[service];
+    if (dir && !existsSync(path.join(ROOT, dir, `.env.${env}`))) missing.add(dir);
+  }
+}
+
+if (missing.size > 0) {
+  console.error(`Missing env files for "${env}". Create them from the templates, then edit secrets:`);
+  for (const dir of missing) {
+    const template = dir === "infrastructure/docker" ? ".env.example" : ".env.docker.example";
+    console.error(`  cp ${dir}/${template} ${dir}/.env.${env}`);
+  }
+  console.error(`Or run: npm run env:init -- ${env}`);
+  process.exit(1);
+}
+
+const envFileArgs = ["--env-file", infraFile];
+if (existsSync(path.join(ROOT, webFile))) envFileArgs.push("--env-file", webFile);
+
+const result = spawnSync("docker", ["compose", "-f", COMPOSE_FILE, ...envFileArgs, ...composeArgs], {
+  cwd: ROOT,
+  stdio: "inherit",
+  env: { ...process.env, APP_ENV: env },
+});
+if (result.error) {
+  console.error(`Could not run docker: ${result.error.message}`);
+  process.exit(1);
+}
+process.exit(result.status ?? 1);

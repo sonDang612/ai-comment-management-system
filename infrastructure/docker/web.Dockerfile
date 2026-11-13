@@ -5,23 +5,26 @@ ARG NODE_VERSION=22
 
 FROM node:${NODE_VERSION}-alpine AS base
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    TURBO_TELEMETRY_DISABLED=1
+    TURBO_TELEMETRY_DISABLED=1 \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    PNPM_STORE_DIR=/pnpm/store
+RUN corepack enable
 WORKDIR /repo
 
 # ---------- prune: keep only @acms/web and its workspace dependencies ----------
 FROM base AS pruner
 COPY . .
-RUN npx --yes turbo@2.11.11 prune @acms/web --docker
+RUN pnpm dlx turbo@2.11.11 prune @acms/web --docker
 
 # ---------- builder ----------
 FROM base AS builder
 COPY --from=pruner /repo/out/json/ ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY --from=pruner /repo/out/full/ ./
 # Inlined into the browser bundle at build time.
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-RUN npx turbo run build --filter=@acms/web
+RUN pnpm turbo run build --filter=@acms/web
 
 # ---------- runner ----------
 FROM node:${NODE_VERSION}-alpine AS runner

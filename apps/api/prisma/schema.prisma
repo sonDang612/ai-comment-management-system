@@ -1,7 +1,7 @@
 // Central business schema, owned by the NestJS API.
 //
 // Rules:
-//   * Every schema change goes through a migration: `npm run db:migrate:create -- --name <change>`.
+//   * Every schema change goes through a migration: `pnpm db:migrate:create --name <change>`.
 //   * Never edit a migration that has been applied anywhere; add a new one.
 //   * Never use `prisma db push` against shared/staging/production databases.
 //   * Every DateTime column is `@db.Timestamptz(3)` (an instant, stored as UTC). The project

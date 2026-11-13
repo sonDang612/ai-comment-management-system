@@ -8,11 +8,11 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 
 - Do not write code comments or docstrings. Use clear names instead. Keep the existing comments.
 - The repo has no tests. Do not write, update or run tests, even when asked to "fix" failing ones: ask first.
-- Do not run Docker or Docker Compose (`npm run docker*`, `docker ...`) on your own. Run them only when the user
+- Do not run Docker or Docker Compose (`pnpm docker*`, `docker ...`) on your own. Run them only when the user
   explicitly asks you to in the current request.
-- Do not install or add packages (`npm install`, `npm i`, `pip install`, `uv add`, `uv sync`). If a new dependency
+- Do not install or add packages (`pnpm install`, `pnpm add`, `pip install`, `uv add`, `uv sync`). If a new dependency
   is needed, stop and ask the user.
-- You may run lint and typecheck to verify the change: `npm run lint`, `npm run typecheck`.
+- You may run lint and typecheck to verify the change: `pnpm lint`, `pnpm typecheck`.
   For Python, use `.venv/Scripts/python.exe -m ruff check apps/ai` (uv is not installed on this machine).
 - Before working in `apps/web`, read `apps/web/AGENTS.md`: this Next.js version differs from what you know.
 

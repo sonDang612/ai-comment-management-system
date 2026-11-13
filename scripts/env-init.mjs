@@ -13,7 +13,7 @@ import path from "node:path";
 const ENVIRONMENTS = ["development", "staging", "production"];
 const ROOT = path.resolve(import.meta.dirname, "..");
 
-const env = process.argv[2];
+const env = process.argv.slice(2).find((arg) => arg !== "--");
 if (env !== undefined && !ENVIRONMENTS.includes(env)) {
   console.error(`Usage: node scripts/env-init.mjs [${ENVIRONMENTS.join("|")}]`);
   process.exit(2);

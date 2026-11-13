@@ -19,7 +19,7 @@ web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP + X-Internal-Token─�
 | AI worker      | `apps/ai` → `acms_ai.worker`: BullMQ (Python) consumer of the `ai-jobs` queue            |
 | Database       | PostgreSQL 17 (tables in the `app` schema), migrations by Prisma Migrate                 |
 | Cache / Queue  | Redis 7                                                                                  |
-| Monorepo       | Turborepo + npm workspaces (JS), uv workspace (Python)                                   |
+| Monorepo       | Turborepo + pnpm workspace (JS), uv workspace (Python)                                  |
 | Infrastructure | Docker Compose                                                                           |
 
 **Who owns what.** The NestJS API is the only public backend and the only owner of the database schema.
@@ -54,7 +54,7 @@ Python never writes business tables directly: results go back to the API.
 │   └── shared/                   # TS contracts: error envelope, health types, queue + job names
 ├── infrastructure/docker/        # api / python / web Dockerfiles + docker-compose.yml
 ├── scripts/                      # docker.mjs (Compose per environment), env-init.mjs
-├── package.json / turbo.json     # npm workspaces + Turborepo pipeline
+├── package.json / pnpm-workspace.yaml / turbo.json   # pnpm workspace + Turborepo pipeline
 └── pyproject.toml / uv.lock      # uv workspace (apps/ai)
 ```
 
@@ -63,19 +63,19 @@ Its `turbo.json` makes `dev` start the server and the worker together (`dev` + `
 
 ## Prerequisites
 
-- Node.js ≥ 22.18 (runs `scripts/*.ts` natively) and npm ≥ 10
+- Node.js ≥ 22.18 (runs `scripts/*.ts` natively) and pnpm 11 (`corepack enable` picks the version pinned in `package.json`)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) ≥ 0.9 (uv installs Python 3.12 itself)
 - Docker with Docker Compose v2
 
 ## Quick start: everything in Docker
 
 ```bash
-npm run env:init -- development   # apps/*/.env.development
-npm run docker:up                 # = npm run docker -- development up -d --build
+pnpm env:init development   # apps/*/.env.development
+pnpm docker:up                 # = pnpm docker development up -d --build
 ```
 
 Other environments use the same wrapper with their own files, e.g.
-`npm run env:init -- production`, edit the secrets, then `npm run docker -- production up -d --build`.
+`pnpm env:init production`, edit the secrets, then `pnpm docker production up -d --build`.
 
 | Service  | URL                                   |
 | -------- | ------------------------------------- |
@@ -85,39 +85,39 @@ Other environments use the same wrapper with their own files, e.g.
 
 The AI server is not published to the host. Only the API calls it, inside the Compose network.
 The `migrate` service runs `prisma migrate deploy` once, and `api` starts only after it succeeds.
-To stop the stack, run `npm run docker:down`. Data volumes are kept; remove them only on purpose with `npm run docker -- <env> down -v`.
+To stop the stack, run `pnpm docker:down`. Data volumes are kept; remove them only on purpose with `pnpm docker <env> down -v`.
 
 ## Local development: apps on the host, infra in Docker
 
 ```bash
-npm run env:init                                      # apps/api/.env, apps/ai/.env, apps/web/.env.local
-npm run env:init -- development                       # apps/api/.env.development (postgres credentials)
-npm install
+pnpm env:init                                      # apps/api/.env, apps/ai/.env, apps/web/.env.local
+pnpm env:init development                       # apps/api/.env.development (postgres credentials)
+pnpm install
 uv sync                                               # Python workspace -> .venv
 
-npm run docker -- development up -d postgres redis   # development postgres + redis only
-npm run db:migrate                                    # prisma migrate deploy
-npm run dev                                           # web :3000, api :4000, ai-server :8000, ai-worker
-npm run queue:smoke --workspace @acms/api             # optional: API -> queue -> worker round trip
+pnpm docker development up -d postgres redis   # development postgres + redis only
+pnpm db:migrate                                    # prisma migrate deploy
+pnpm dev                                           # web :3000, api :4000, ai-server :8000, ai-worker
+pnpm --filter @acms/api queue:smoke             # optional: API -> queue -> worker round trip
 ```
 
 `AI_SERVICE_TOKEN` (api) and `INTERNAL_API_TOKEN` (apps/ai) must have the same value.
-You can also run one app on its own, e.g. `npx turbo run dev --filter @acms/api`, or `--filter @acms/ai`
-for both AI processes. One AI process alone: `npm run dev --workspace @acms/ai` (server) or
-`npm run dev:worker --workspace @acms/ai`.
+You can also run one app on its own, e.g. `pnpm turbo run dev --filter @acms/api`, or `--filter @acms/ai`
+for both AI processes. One AI process alone: `pnpm --filter @acms/ai dev` (server) or
+`pnpm --filter @acms/ai dev:worker`.
 
 ## Common commands
 
 | Command                              | What it does                                                 |
 | ------------------------------------ | ------------------------------------------------------------ |
-| `npm run dev`                        | Run all apps in watch mode (Turborepo)                       |
-| `npm run build`                      | Build shared, api and web                                    |
-| `npm run lint`                       | ESLint (web), oxlint (api), Ruff (Python)                    |
-| `npm run typecheck`                  | `tsc` for web, api and shared                                |
-| `npm run db:migrate`                 | Apply pending migrations                                     |
-| `npm run env:init [-- <env>]`        | Create missing env files from the templates                  |
-| `npm run docker:up` / `docker:down`  | Full development stack in Docker                             |
-| `npm run docker -- <env> <args>`     | Any Compose command for `development`/`staging`/`production` |
+| `pnpm dev`                        | Run all apps in watch mode (Turborepo)                       |
+| `pnpm build`                      | Build shared, api and web                                    |
+| `pnpm lint`                       | ESLint (web), oxlint (api), Ruff (Python)                    |
+| `pnpm typecheck`                  | `tsc` for web, api and shared                                |
+| `pnpm db:migrate`                 | Apply pending migrations                                     |
+| `pnpm env:init [<env>]`           | Create missing env files from the templates                  |
+| `pnpm docker:up` / `docker:down`  | Full development stack in Docker                             |
+| `pnpm docker <env> <args>`     | Any Compose command for `development`/`staging`/`production` |
 
 ## Database migrations (Prisma Migrate)
 
@@ -133,10 +133,10 @@ for both AI processes. One AI process alone: `npm run dev --workspace @acms/ai` 
 
 ```bash
 # 1. Add/modify models in prisma/schema.prisma
-npm run db:migrate:create -- --name create_comments   # writes prisma/migrations/<ts>_create_comments/migration.sql
+pnpm db:migrate:create --name create_comments   # writes prisma/migrations/<ts>_create_comments/migration.sql
 # 2. Review the SQL, then apply:
-npm run db:migrate:dev
-npm run db:status
+pnpm db:migrate:dev
+pnpm db:status
 ```
 
 - The DB URL comes from `DATABASE_URL`. `?schema=app` puts every API table in the `app` Postgres schema.
@@ -160,7 +160,7 @@ Each app has **one template, `.env.example`**, for all of its env files:
 
 | File                                   | Used by                                   |
 | -------------------------------------- | ----------------------------------------- |
-| `apps/api/.env`                        | API on the host (`npm run dev`)           |
+| `apps/api/.env`                        | API on the host (`pnpm dev`)           |
 | `apps/ai/.env`                         | AI server + worker on the host            |
 | `apps/web/.env.local`                  | Web on the host                           |
 | `apps/api/.env.<env>`                  | `api` + `migrate`, Postgres credentials   |
@@ -170,13 +170,13 @@ Each app has **one template, `.env.example`**, for all of its env files:
 The templates use host values (`localhost`). Inside Docker, Compose overrides the in-network addresses:
 `DATABASE_URL` (built from `POSTGRES_*`), `REDIS_URL` and `AI_SERVICE_URL`, plus `APP_ENV`, `NODE_ENV`, `PORT` and `TZ`.
 
-`<env>` is `development`, `staging` or `production`. `npm run docker -- <env> …` (`scripts/docker.mjs`) does three things:
+`<env>` is `development`, `staging` or `production`. `pnpm docker <env> …` (`scripts/docker.mjs`) does three things:
 
 - sets `APP_ENV=<env>` in every container,
 - runs the stack as its own Compose project, `acms-<env>`, with separate containers, network and data volumes,
 - refuses to start a service whose env file is missing, and prints the `cp` command that fixes it.
 
-`npm run env:init` creates the host files and `npm run env:init -- <env>` creates the Docker files, both from
+`pnpm env:init` creates the host files and `pnpm env:init <env>` creates the Docker files, both from
 `.env.example`. Existing files are never overwritten. Only the templates are committed: every real `.env*` file is
 git-ignored. Real environment variables always take precedence.
 
@@ -258,7 +258,7 @@ locale-prefixed URLs: `/zh-CN/...`, `/en/...`.
 
 ## Troubleshooting
 
-- **Port already in use**: change `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT` or `WEB_PORT` as an environment variable (`POSTGRES_PORT=5433 npm run docker:up`) or in `apps/api/.env.<env>`.
+- **Port already in use**: change `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT` or `WEB_PORT` as an environment variable (`POSTGRES_PORT=5433 pnpm docker:up`) or in `apps/api/.env.<env>`.
   Two environments running at once need different ports.
 - **Web shows "API unreachable"**: check `NEXT_PUBLIC_API_URL`, and that the web origin is listed in `CORS_ORIGINS`.
   For the Docker image, rebuild after changing it (it is a build arg).

@@ -21,7 +21,7 @@
     "queue:smoke": "node scripts/queue-smoke.ts"
   },
   "dependencies": {
-    "@acms/shared": "*",
+    "@acms/shared": "workspace:*",
     "@nestjs/bullmq": "^12.0.1",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.1.1",

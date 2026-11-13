@@ -3,7 +3,7 @@
  * Docker Compose wrapper: one stack per environment, configured by per-app env files.
  *
  *   node scripts/docker.mjs <development|staging|production> <compose args...>
- *   npm run docker -- production up -d --build
+ *   pnpm docker production up -d --build
  *
  * It sets APP_ENV (compose project `acms-<env>`, env_file paths, image tags) and passes
  * `apps/api/.env.<env>` (POSTGRES_* credentials) and `apps/web/.env.<env>` to Compose for interpolation.
@@ -28,7 +28,7 @@ const SERVICE_ENV_FILES = {
 // Compose subcommands that create or start containers (and so need their env files).
 const STARTING_COMMANDS = new Set(["up", "create", "run", "build", "start", "restart"]);
 
-const [env, ...composeArgs] = process.argv.slice(2);
+const [env, ...composeArgs] = process.argv.slice(2).filter((arg, index) => !(index === 0 && arg === "--"));
 if (!ENVIRONMENTS.includes(env) || composeArgs.length === 0) {
   console.error(`Usage: node scripts/docker.mjs <${ENVIRONMENTS.join("|")}> <compose args...>`);
   process.exit(2);
@@ -56,7 +56,7 @@ if (missing.size > 0) {
   for (const dir of missing) {
     console.error(`  cp ${dir}/.env.example ${dir}/.env.${env}`);
   }
-  console.error(`Or run: npm run env:init -- ${env}`);
+  console.error(`Or run: pnpm env:init ${env}`);
   process.exit(1);
 }
 

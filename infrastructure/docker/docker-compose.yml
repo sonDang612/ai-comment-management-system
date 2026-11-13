@@ -1,11 +1,11 @@
 # Docker stack, one per environment (development | staging | production).
 # Run it through the wrapper, which picks the env files and the project name:
-#   npm run docker -- <env> <compose args>      e.g. npm run docker -- production up -d --build
-#   npm run docker:up / docker:down              (= development)
-#   npm run docker -- development up -d postgres redis   (postgres + redis only, for host dev)
+#   pnpm docker <env> <compose args>      e.g. pnpm docker production up -d --build
+#   pnpm docker:up / docker:down              (= development)
+#   pnpm docker development up -d postgres redis   (postgres + redis only, for host dev)
 #
 # Configuration comes from env files, never from the repository root. Each one is created from the
-# app's .env.example (`npm run env:init -- <env>`):
+# app's .env.example (`pnpm env:init <env>`):
 #   apps/api/.env.<env>                api + migrate containers (env_file); POSTGRES_* for postgres (${...})
 #   apps/ai/.env.<env>                 ai-server + ai-worker containers (env_file)
 #   apps/web/.env.<env>                web: NEXT_PUBLIC_* build args (${...}) + container env
@@ -17,7 +17,7 @@
 #                            \--Prisma--> postgres
 
 # One isolated project per environment: separate containers, networks and data volumes.
-name: acms-${APP_ENV:?run through scripts/docker.mjs (npm run docker -- <env> ...)}
+name: acms-${APP_ENV:?run through scripts/docker.mjs (pnpm docker <env> ...)}
 
 x-common-env: &common-env
   # Set by scripts/docker.mjs; overrides whatever the env file says.

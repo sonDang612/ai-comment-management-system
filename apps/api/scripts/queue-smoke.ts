@@ -2,7 +2,7 @@
  * End-to-end queue check: enqueues `system.ping` on the AI jobs queue and waits for the
  * Python worker (apps/ai, `acms_ai.worker`) to return the result through BullMQ.
  *
- *   npm run queue:smoke --workspace @acms/api        # needs Redis + a running worker
+ *   pnpm --filter @acms/api queue:smoke        # needs Redis + a running worker
  *
  * Runs with Node's built-in TypeScript support (erasable syntax only, no decorators).
  */

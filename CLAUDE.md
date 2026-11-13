@@ -8,7 +8,8 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 
 - Do not write code comments or docstrings. Use clear names instead. Keep the existing comments.
 - Do not write or update tests, unless the user asks for them.
-- Do not run Docker or Docker Compose (`npm run docker*`, `docker ...`).
+- Do not run Docker or Docker Compose (`npm run docker*`, `docker ...`) on your own. Run them only when the user
+  explicitly asks you to in the current request.
 - Do not install or add packages (`npm install`, `npm i`, `pip install`, `uv add`, `uv sync`). If a new dependency
   is needed, stop and ask the user.
 - You may run lint and typecheck to verify the change: `npm run lint`, `npm run typecheck`.
@@ -39,6 +40,9 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
   It only does AI work (normalization, rule filter, model inference). Any data it needs comes from the API
   over HTTP or in the job payload.
+- `apps/ai` returns analysis only (`is_valid`, `is_question`, `confidence`, `reason`, `model_version`), never a
+  business decision. The API (`ModerationPolicy`) maps the analysis to `approved` / `pending` / `disabled`
+  with the thresholds, labels and priority rules.
 - API: controllers stay thin, logic lives in services, infrastructure clients live in `src/infrastructure`.
   Throw `AppException` subclasses, never raw errors.
 - AI: shared code in `core/` and `modules/`. `core` never imports `server` or `worker`, and `server` and `worker`

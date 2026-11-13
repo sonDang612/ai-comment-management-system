@@ -20,7 +20,10 @@ export function AntdProvider({ children }: { children: ReactNode }) {
     <AntdRegistry>
       <ConfigProvider
         locale={ANTD_LOCALES[locale]}
-        theme={{ algorithm: scheme === "dark" ? theme.darkAlgorithm : theme.defaultAlgorithm }}
+        theme={{
+          algorithm: scheme === "dark" ? theme.darkAlgorithm : theme.defaultAlgorithm,
+          cssVar: { key: `acms-${scheme}` },
+        }}
       >
         <App>{children}</App>
       </ConfigProvider>

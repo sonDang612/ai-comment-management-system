@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import type { CommentDto, CommentListResponse } from '@acms/shared';
-import { parseCommentListQuery, parseCreateCommentRequest, type RawCommentListQuery } from './comment-input.js';
+import { parseCommentListQuery, type RawCommentListQuery } from './comment-input.js';
 import { CommentsService } from './comments.service.js';
+import { CreateCommentDto } from './dto/create-comment.dto.js';
 
 @Controller('comments')
 export class CommentsController {
@@ -13,7 +14,7 @@ export class CommentsController {
   }
 
   @Post()
-  create(@Body() body: unknown): Promise<CommentDto> {
-    return this.comments.create(parseCreateCommentRequest(body));
+  create(@Body() body: CreateCommentDto): Promise<CommentDto> {
+    return this.comments.create(body);
   }
 }

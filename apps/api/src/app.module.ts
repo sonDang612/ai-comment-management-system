@@ -1,9 +1,10 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { RequestContextMiddleware } from './common/context/request-context.middleware.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor.js';
+import { AppValidationPipe } from './common/pipes/app-validation.pipe.js';
 import { validateEnv } from './config/env.js';
 import { AiServiceModule } from './infrastructure/ai-service/ai-service.module.js';
 import { PrismaModule } from './infrastructure/prisma/prisma.module.js';
@@ -30,6 +31,7 @@ import { RuleSettingsModule } from './modules/rule-settings/rule-settings.module
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },
+    { provide: APP_PIPE, useClass: AppValidationPipe },
   ],
 })
 export class AppModule implements NestModule {

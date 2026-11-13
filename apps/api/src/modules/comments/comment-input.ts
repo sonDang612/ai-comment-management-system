@@ -1,8 +1,6 @@
 import {
-  COMMENT_CONTENT_MAX_LENGTH,
   COMMENT_SEARCH_MAX_LENGTH,
   CommentStatus,
-  type CreateCommentRequest,
   DEFAULT_COMMENT_PAGE_SIZE,
   MAX_COMMENT_PAGE_SIZE,
 } from '@acms/shared';
@@ -24,23 +22,6 @@ export interface RawCommentListQuery {
 
 const COMMENT_STATUSES = new Set<string>(Object.values(CommentStatus));
 
-export function parseCreateCommentRequest(body: unknown): CreateCommentRequest {
-  const content =
-    typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['content'] : undefined;
-  if (typeof content !== 'string') {
-    throw new ValidationException('content must be a string', [{ field: 'content', rule: 'string' }]);
-  }
-  const trimmed = content.trim();
-  if (trimmed.length === 0) {
-    throw new ValidationException('content must not be empty', [{ field: 'content', rule: 'required' }]);
-  }
-  if (trimmed.length > COMMENT_CONTENT_MAX_LENGTH) {
-    throw new ValidationException(`content must be at most ${COMMENT_CONTENT_MAX_LENGTH} characters`, [
-      { field: 'content', rule: 'max_length', max: COMMENT_CONTENT_MAX_LENGTH },
-    ]);
-  }
-  return { content: trimmed };
-}
 
 function parsePositiveInt(field: string, raw: string | undefined, fallback: number, max?: number): number {
   if (raw === undefined || raw === '') return fallback;

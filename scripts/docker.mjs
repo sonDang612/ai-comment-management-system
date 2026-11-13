@@ -54,7 +54,7 @@ if (STARTING_COMMANDS.has(command)) {
 if (missing.size > 0) {
   console.error(`Missing env files for "${env}". Create them from the templates, then edit secrets:`);
   for (const dir of missing) {
-    console.error(`  cp ${dir}/.env.docker.example ${dir}/.env.${env}`);
+    console.error(`  cp ${dir}/.env.example ${dir}/.env.${env}`);
   }
   console.error(`Or run: npm run env:init -- ${env}`);
   process.exit(1);

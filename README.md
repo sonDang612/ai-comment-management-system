@@ -159,14 +159,19 @@ npm run db:status
 
 There is **no `.env` at the repository root**. Each project keeps its own files, and Docker picks them by environment.
 
-| File                                   | Used by                                   | Template                 |
-| -------------------------------------- | ----------------------------------------- | ------------------------ |
-| `apps/api/.env`                        | API on the host (`npm run dev`)           | `.env.example`           |
-| `apps/ai/.env`                         | AI server + worker on the host            | `.env.example`           |
-| `apps/web/.env.local`                  | Web on the host                           | `.env.example`           |
-| `apps/api/.env.<env>`                  | `api` + `migrate`, Postgres credentials   | `.env.docker.example`    |
-| `apps/ai/.env.<env>`                   | `ai-server` + `ai-worker` containers      | `.env.docker.example`    |
-| `apps/web/.env.<env>`                  | `web` image build args (`NEXT_PUBLIC_*`)  | `.env.docker.example`    |
+Each app has **one template, `.env.example`**, for all of its env files:
+
+| File                                   | Used by                                   |
+| -------------------------------------- | ----------------------------------------- |
+| `apps/api/.env`                        | API on the host (`npm run dev`)           |
+| `apps/ai/.env`                         | AI server + worker on the host            |
+| `apps/web/.env.local`                  | Web on the host                           |
+| `apps/api/.env.<env>`                  | `api` + `migrate`, Postgres credentials   |
+| `apps/ai/.env.<env>`                   | `ai-server` + `ai-worker` containers      |
+| `apps/web/.env.<env>`                  | `web` image build args (`NEXT_PUBLIC_*`)  |
+
+The templates use host values (`localhost`). Inside Docker, Compose overrides the in-network addresses:
+`DATABASE_URL` (built from `POSTGRES_*`), `REDIS_URL` and `AI_SERVICE_URL`, plus `APP_ENV`, `NODE_ENV`, `PORT` and `TZ`.
 
 `<env>` is `development`, `staging` or `production`. `npm run docker -- <env> …` (`scripts/docker.mjs`) does three things:
 
@@ -174,15 +179,16 @@ There is **no `.env` at the repository root**. Each project keeps its own files,
 - runs the stack as its own Compose project, `acms-<env>`, with separate containers, network and data volumes,
 - refuses to start a service whose env file is missing, and prints the `cp` command that fixes it.
 
-`npm run env:init` creates the host files and `npm run env:init -- <env>` creates the Docker files, both from the
-templates. Existing files are never overwritten. Only the templates are committed: every real `.env*` file is
+`npm run env:init` creates the host files and `npm run env:init -- <env>` creates the Docker files, both from
+`.env.example`. Existing files are never overwritten. Only the templates are committed: every real `.env*` file is
 git-ignored. Real environment variables always take precedence.
 
 Values that must agree across files:
 
 - `AI_SERVICE_TOKEN` (apps/api) = `INTERNAL_API_TOKEN` (apps/ai).
-- The credentials in `DATABASE_URL` = `POSTGRES_USER/PASSWORD/DB`, both in `apps/api/.env.<env>`. On the host,
-  `apps/api/.env` must use the same credentials as `apps/api/.env.development`.
+- `POSTGRES_USER/PASSWORD/DB` in `apps/api/.env.<env>` create the database, and Compose builds the in-network
+  `DATABASE_URL` from them (keep the password URL-safe). On the host, `DATABASE_URL` in `apps/api/.env` must use
+  the same credentials as `apps/api/.env.development`.
 - `NEXT_PUBLIC_API_URL` (apps/web) is the API URL **as seen from the browser**. It is inlined at build time, so rebuild after changing it.
 - `APP_ENV=production` disables the AI server's `/docs`. `LOG_FORMAT=json` is meant for log shipping.
 

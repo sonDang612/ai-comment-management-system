@@ -22,9 +22,9 @@ if (env !== undefined && !ENVIRONMENTS.includes(env)) {
 /** [template, target] pairs, relative to the repo root. */
 const pairs = env
   ? [
-      ["apps/api/.env.docker.example", `apps/api/.env.${env}`],
-      ["apps/ai/.env.docker.example", `apps/ai/.env.${env}`],
-      ["apps/web/.env.docker.example", `apps/web/.env.${env}`],
+      ["apps/api/.env.example", `apps/api/.env.${env}`],
+      ["apps/ai/.env.example", `apps/ai/.env.${env}`],
+      ["apps/web/.env.example", `apps/web/.env.${env}`],
     ]
   : [
       ["apps/api/.env.example", "apps/api/.env"],

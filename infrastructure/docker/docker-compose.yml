@@ -4,7 +4,8 @@
 #   npm run docker:up / docker:down              (= development)
 #   npm run docker -- development up -d postgres redis   (postgres + redis only, for host dev)
 #
-# Configuration comes from env files, never from the repository root:
+# Configuration comes from env files, never from the repository root. Each one is created from the
+# app's .env.example (`npm run env:init -- <env>`):
 #   apps/api/.env.<env>                api + migrate containers (env_file); POSTGRES_* for postgres (${...})
 #   apps/ai/.env.<env>                 ai-server + ai-worker containers (env_file)
 #   apps/web/.env.<env>                web: NEXT_PUBLIC_* build args (${...}) + container env
@@ -24,6 +25,12 @@ x-common-env: &common-env
   # Project time zone is UTC+8 (packages/shared/src/time.ts). Apps also enforce it in code.
   TZ: Asia/Shanghai
 
+# In-network addresses. They override the host (localhost) values of the shared .env.example templates.
+x-api-network-env: &api-network-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:?set in apps/api/.env.<env>}:${POSTGRES_PASSWORD:?set in apps/api/.env.<env>}@postgres:5432/${POSTGRES_DB:?set in apps/api/.env.<env>}?schema=app
+  REDIS_URL: redis://redis:6379/0
+  AI_SERVICE_URL: http://ai-server:8000
+
 x-api-build: &api-build
   context: ../..
   dockerfile: infrastructure/docker/api.Dockerfile
@@ -36,7 +43,9 @@ x-ai-build: &ai-build
 x-ai-service: &ai-service
   restart: unless-stopped
   env_file: ../../apps/ai/.env.${APP_ENV}
-  environment: *common-env
+  environment:
+    <<: *common-env
+    REDIS_URL: redis://redis:6379/0
 
 services:
   postgres:
@@ -82,7 +91,8 @@ services:
       target: migrate
     image: acms-api-migrate:${APP_ENV}
     env_file: ../../apps/api/.env.${APP_ENV}
-    environment: *common-env
+    environment:
+      <<: [*common-env, *api-network-env]
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,7 +106,7 @@ services:
     restart: unless-stopped
     env_file: ../../apps/api/.env.${APP_ENV}
     environment:
-      <<: *common-env
+      <<: [*common-env, *api-network-env]
       # Fixed by the image: production build, listening on 4000 inside the container.
       NODE_ENV: production
       PORT: 4000

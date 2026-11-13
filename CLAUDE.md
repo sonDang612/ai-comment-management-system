@@ -40,9 +40,11 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
   It only does AI work (normalization, rule filter, model inference). Any data it needs comes from the API
   over HTTP or in the job payload.
-- `apps/ai` returns analysis only (`is_valid`, `is_question`, `confidence`, `reason`, `model_version`), never a
+- `apps/ai` returns analysis only (`is_valid`, `is_question`, `confidence`, `reason`), never a
   business decision. The API (`ModerationPolicy`) maps the analysis to `approved` / `pending` / `disabled`
   with the thresholds, labels and priority rules.
+- Rule-based checks (from the admin rule settings) run in the API (`modules/moderation/rules`) before the AI.
+  The AI is called only when every rule passes; a failed rule decides the comment with `decided_by = rule_filter`.
 - API: controllers stay thin, logic lives in services, infrastructure clients live in `src/infrastructure`.
   Throw `AppException` subclasses, never raw errors.
 - AI: shared code in `core/` and `modules/`. `core` never imports `server` or `worker`, and `server` and `worker`

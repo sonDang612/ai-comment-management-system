@@ -121,14 +121,10 @@ const en: Dictionary = {
     },
     links: {
       title: "Links & domains",
-      description: "Control links in comments and the domains that are allowed or blocked.",
-      allowLinks: "Allow links in comments",
-      allowLinksHint:
-        "When on, blacklisted domains are still blocked. When off, only whitelisted domains are allowed.",
+      description:
+        "Only links to whitelisted domains (and their subdomains) are allowed. Every other link is blocked.",
       whitelist: "Domain whitelist",
-      whitelistHint: "Links to these domains are always allowed.",
-      blacklist: "Domain blacklist",
-      blacklistHint: "Links to these domains are always blocked.",
+      whitelistHint: "Only links to these domains are allowed.",
       domainPlaceholder: "e.g. example.com",
       add: "Add",
       remove: "Remove",
@@ -151,8 +147,7 @@ const en: Dictionary = {
       keywordDuplicate: "This keyword already exists",
       domainInvalid: "Invalid domain",
       domainDuplicate: "This domain is already in the list",
-      domainInOtherList: "This domain is already in the {list}",
-      domainLimitReached: "Each list can have at most {max} domains",
+      domainLimitReached: "The whitelist can have at most {max} domains",
     },
   },
   health: {

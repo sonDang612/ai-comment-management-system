@@ -30,9 +30,7 @@ export function toRuleSettingsDto(row: RuleSettingsRow | null, keywords: Restric
     },
     keywords: keywordDtos,
     links: {
-      allow_links: row.allowLinks,
       domain_whitelist: row.domainWhitelist,
-      domain_blacklist: row.domainBlacklist,
     },
     spam: {
       duplicate_detection_enabled: row.duplicateDetectionEnabled,
@@ -48,9 +46,7 @@ export function toRuleSettingsData(settings: RuleSettings): RuleSettingsData {
     allowEmpty: settings.validation.allow_empty,
     allowEmojiOnly: settings.validation.allow_emoji_only,
     maxRepeatedChars: settings.validation.max_repeated_chars,
-    allowLinks: settings.links.allow_links,
     domainWhitelist: settings.links.domain_whitelist,
-    domainBlacklist: settings.links.domain_blacklist,
     duplicateDetectionEnabled: settings.spam.duplicate_detection_enabled,
     duplicateWindowMinutes: settings.spam.duplicate_window_minutes,
   };

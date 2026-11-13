@@ -2,7 +2,6 @@ from typing import Protocol
 
 from acms_ai.modules.analysis.schemas import CommentAnalysis, CommentAnalysisRequest
 
-STUB_MODEL_VERSION = "stub-v0/prompt-none/rules-none"
 STUB_REASON = "AI 分析尚未启用,默认视为有效评论"
 
 
@@ -17,7 +16,6 @@ class StubCommentAnalyzer:
             is_question=False,
             confidence=1.0,
             reason=STUB_REASON,
-            model_version=STUB_MODEL_VERSION,
         )
 
 

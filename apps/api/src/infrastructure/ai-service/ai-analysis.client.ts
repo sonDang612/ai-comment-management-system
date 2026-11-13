@@ -14,8 +14,7 @@ function isAiCommentAnalysis(value: unknown): value is AiCommentAnalysis {
     typeof analysis['confidence'] === 'number' &&
     analysis['confidence'] >= 0 &&
     analysis['confidence'] <= 1 &&
-    typeof analysis['reason'] === 'string' &&
-    typeof analysis['model_version'] === 'string'
+    typeof analysis['reason'] === 'string'
   );
 }
 

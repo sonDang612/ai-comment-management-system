@@ -62,5 +62,4 @@ export interface AiCommentAnalysis {
   is_question: boolean;
   confidence: number;
   reason: string;
-  model_version: string;
 }

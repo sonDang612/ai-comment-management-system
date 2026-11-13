@@ -31,9 +31,7 @@ export interface CommentValidationSettings {
 }
 
 export interface LinkSettings {
-  allow_links: boolean;
   domain_whitelist: string[];
-  domain_blacklist: string[];
 }
 
 export interface SpamDetectionSettings {

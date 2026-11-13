@@ -51,9 +51,7 @@ model RuleSettings {
   allowEmpty                Boolean  @map("allow_empty")
   allowEmojiOnly            Boolean  @map("allow_emoji_only")
   maxRepeatedChars          Int      @map("max_repeated_chars")
-  allowLinks                Boolean  @map("allow_links")
   domainWhitelist           String[] @map("domain_whitelist")
-  domainBlacklist           String[] @map("domain_blacklist")
   duplicateDetectionEnabled Boolean  @map("duplicate_detection_enabled")
   duplicateWindowMinutes    Int      @map("duplicate_window_minutes")
   createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -103,7 +101,7 @@ model ModerationDecision {
   confidence        Decimal       @db.Decimal(3, 2)
   reason            String
   decidedBy         DecidedBy     @map("decided_by")
-  modelVersion      String        @map("model_version")
+  modelVersion      String?       @map("model_version")
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   comment           Comment       @relation(fields: [commentId], references: [id], onDelete: Cascade)
 

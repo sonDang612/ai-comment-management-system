@@ -130,9 +130,7 @@ export function parseRuleSettings(body: unknown): RuleSettings {
     },
     keywords: parser.keywords(root['keywords']),
     links: {
-      allow_links: parser.boolean(links['allow_links'], 'links.allow_links'),
       domain_whitelist: parser.domains(links['domain_whitelist'], 'links.domain_whitelist'),
-      domain_blacklist: parser.domains(links['domain_blacklist'], 'links.domain_blacklist'),
     },
     spam: {
       duplicate_detection_enabled: parser.boolean(
@@ -149,12 +147,6 @@ export function parseRuleSettings(body: unknown): RuleSettings {
 
   if (settings.validation.min_length > settings.validation.max_length) {
     parser.issues.push({ field: 'validation.max_length', rule: 'gte', other: 'validation.min_length' });
-  }
-  const overlap = settings.links.domain_whitelist.filter((domain) =>
-    settings.links.domain_blacklist.includes(domain),
-  );
-  if (overlap.length > 0) {
-    parser.issues.push({ field: 'links.domain_blacklist', rule: 'disjoint', other: 'links.domain_whitelist', overlap });
   }
 
   if (parser.issues.length > 0) {

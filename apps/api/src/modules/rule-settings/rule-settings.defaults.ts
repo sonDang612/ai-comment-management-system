@@ -9,9 +9,7 @@ export const DEFAULT_RULE_SETTINGS: Omit<RuleSettings, 'keywords'> = {
     max_repeated_chars: 10,
   },
   links: {
-    allow_links: true,
     domain_whitelist: [],
-    domain_blacklist: [],
   },
   spam: {
     duplicate_detection_enabled: false,

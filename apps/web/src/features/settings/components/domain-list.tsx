@@ -10,11 +10,9 @@ interface DomainListProps {
   id?: string;
   value?: string[];
   onChange?: (domains: string[]) => void;
-  otherList: string[];
-  otherListLabel: string;
 }
 
-export function DomainList({ id, value = [], onChange, otherList, otherListLabel }: DomainListProps) {
+export function DomainList({ id, value = [], onChange }: DomainListProps) {
   const { dict } = useI18n();
   const t = dict.settings.links;
   const errors = dict.settings.errors;
@@ -24,7 +22,6 @@ export function DomainList({ id, value = [], onChange, otherList, otherListLabel
   const findError = (domain: string): string | null => {
     if (!isValidDomain(domain)) return errors.domainInvalid;
     if (value.includes(domain)) return errors.domainDuplicate;
-    if (otherList.includes(domain)) return format(errors.domainInOtherList, { list: otherListLabel });
     if (value.length >= RULE_SETTINGS_LIMITS.maxDomainsPerList) {
       return format(errors.domainLimitReached, { max: RULE_SETTINGS_LIMITS.maxDomainsPerList });
     }

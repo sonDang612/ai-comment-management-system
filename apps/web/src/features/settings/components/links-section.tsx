@@ -1,21 +1,33 @@
 "use client";
 
+import type { RuleSettings } from "@acms/shared";
 import { Form, Switch } from "antd";
 import { useI18n } from "@/i18n";
 import { DomainList } from "./domain-list";
-import { SettingsSection } from "./settings-section";
+import { SettingsSectionForm } from "./settings-section-form";
 
 const WHITELIST_FIELD = ["links", "domain_whitelist"];
 const BLACKLIST_FIELD = ["links", "domain_blacklist"];
 
-export function LinksSection() {
+export function LinksSection({ settings }: { settings: RuleSettings }) {
+  const { dict } = useI18n();
+  const t = dict.settings.links;
+
+  return (
+    <SettingsSectionForm section="links" settings={settings} title={t.title} description={t.description}>
+      <LinksFields />
+    </SettingsSectionForm>
+  );
+}
+
+function LinksFields() {
   const { dict } = useI18n();
   const t = dict.settings.links;
   const whitelist: string[] = Form.useWatch(WHITELIST_FIELD) ?? [];
   const blacklist: string[] = Form.useWatch(BLACKLIST_FIELD) ?? [];
 
   return (
-    <SettingsSection title={t.title} description={t.description}>
+    <>
       <Form.Item
         name={["links", "allow_links"]}
         label={t.allowLinks}
@@ -32,6 +44,6 @@ export function LinksSection() {
           <DomainList otherList={whitelist} otherListLabel={t.whitelist} />
         </Form.Item>
       </div>
-    </SettingsSection>
+    </>
   );
 }

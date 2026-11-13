@@ -80,7 +80,7 @@ const zhCN = {
     title: "规则设置",
     save: "保存更改",
     cancel: "取消",
-    saved: "设置已保存",
+    sectionSaved: "“{section}”已保存",
     saveFailed: "设置保存失败：{message}",
     loadFailed: "设置加载失败：{message}",
     invalid: "请先修正标红的设置项",

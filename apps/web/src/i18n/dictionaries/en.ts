@@ -76,7 +76,7 @@ const en: Dictionary = {
     title: "Rule settings",
     save: "Save changes",
     cancel: "Cancel",
-    saved: "Settings saved",
+    sectionSaved: "{section} saved",
     saveFailed: "Failed to save settings: {message}",
     loadFailed: "Failed to load settings: {message}",
     invalid: "Fix the highlighted settings first",

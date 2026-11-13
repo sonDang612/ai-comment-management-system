@@ -1,19 +1,24 @@
 "use client";
 
-import { RULE_SETTINGS_LIMITS } from "@acms/shared";
+import { RULE_SETTINGS_LIMITS, type RuleSettings } from "@acms/shared";
 import { Form, InputNumber, Switch } from "antd";
 import { useI18n } from "@/i18n";
 import { integerRangeRules } from "../form-rules";
-import { SettingsSection } from "./settings-section";
+import { SettingsSectionForm } from "./settings-section-form";
 
 const MIN_LENGTH_FIELD = ["validation", "min_length"];
 
-export function ValidationSection() {
+export function ValidationSection({ settings }: { settings: RuleSettings }) {
   const { dict } = useI18n();
   const t = dict.settings;
 
   return (
-    <SettingsSection title={t.validation.title} description={t.validation.description}>
+    <SettingsSectionForm
+      section="validation"
+      settings={settings}
+      title={t.validation.title}
+      description={t.validation.description}
+    >
       <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
         <Form.Item
           name={MIN_LENGTH_FIELD}
@@ -82,6 +87,6 @@ export function ValidationSection() {
           <Switch />
         </Form.Item>
       </div>
-    </SettingsSection>
+    </SettingsSectionForm>
   );
 }

@@ -6,7 +6,7 @@ import {
   type CommentDto,
   CommentStatus,
 } from "@acms/shared";
-import { Alert, Button, Input, Select, Table, type TableColumnsType, Typography } from "antd";
+import { Alert, Button, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
 import { Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
@@ -19,6 +19,25 @@ import { type CommentStatusFilter, useCommentsUiStore } from "../store";
 import { CommentStatusTag } from "./comment-status-tag";
 
 const SEARCH_DEBOUNCE_MS = 400;
+const SKELETON_ROW_COUNT = 8;
+
+interface SkeletonRow {
+  id: string;
+  isSkeleton: true;
+}
+
+type CommentRow = CommentDto | SkeletonRow;
+
+const SKELETON_ROWS: SkeletonRow[] = Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => ({
+  id: `skeleton-${index}`,
+  isSkeleton: true,
+}));
+
+function isSkeletonRow(row: CommentRow): row is SkeletonRow {
+  return "isSkeleton" in row;
+}
+
+const textSkeleton = <Skeleton.Input active size="small" block />;
 
 const STATUS_FILTERS: CommentStatusFilter[] = [
   "all",
@@ -40,48 +59,57 @@ export function CommentTable() {
   const setSearch = useCommentsUiStore((state) => state.setSearch);
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), SEARCH_DEBOUNCE_MS);
-  const { data, error, isPending, isFetching, refetch } = useComments({
+  const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useComments({
     page,
     pageSize,
     status: statusFilter === "all" ? undefined : statusFilter,
     search: search || undefined,
   });
+  const isLoadingRows = isPending || isPlaceholderData;
   const tableWrapperRef = useRef<HTMLDivElement>(null);
   const tableBodyHeight = useTableBodyHeight(
     tableWrapperRef,
     `${data?.items.length ?? 0}/${data?.total ?? 0}/${Boolean(error)}`,
   );
 
-  const columns: TableColumnsType<CommentDto> = [
+  const columns: TableColumnsType<CommentRow> = [
     {
+      key: "content",
       title: t.columns.content,
-      dataIndex: "content",
-      render: (content: string) => (
-        <Typography.Paragraph
-          className="!mb-0 whitespace-pre-wrap break-all"
-          ellipsis={{ rows: 3, expandable: "collapsible" }}
-        >
-          {content}
-        </Typography.Paragraph>
-      ),
+      render: (_, row) =>
+        isSkeletonRow(row) ? (
+          textSkeleton
+        ) : (
+          <Typography.Paragraph
+            className="!mb-0 whitespace-pre-wrap break-all"
+            ellipsis={{ rows: 3, expandable: "collapsible" }}
+          >
+            {row.content}
+          </Typography.Paragraph>
+        ),
     },
     {
+      key: "status",
       title: t.columns.status,
-      dataIndex: "status",
       width: 110,
-      render: (status: CommentStatus) => <CommentStatusTag status={status} />,
+      render: (_, row) =>
+        isSkeletonRow(row) ? (
+          <Skeleton.Button active size="small" />
+        ) : (
+          <CommentStatusTag status={row.status} />
+        ),
     },
     {
+      key: "reason",
       title: t.columns.reason,
-      dataIndex: "reason",
       width: 260,
-      render: (reason: string | null) => reason ?? "-",
+      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : (row.reason ?? "-")),
     },
     {
+      key: "created_at",
       title: t.columns.createdAt,
-      dataIndex: "created_at",
       width: 190,
-      render: (createdAt: string) => formatDateTime(createdAt, locale),
+      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : formatDateTime(row.created_at, locale)),
     },
   ];
 
@@ -145,11 +173,10 @@ export function CommentTable() {
             : ({ "--table-body-height": `${tableBodyHeight}px` } as CSSProperties)
         }
       >
-        <Table<CommentDto>
+        <Table<CommentRow>
           rowKey="id"
           columns={columns}
-          dataSource={data?.items ?? []}
-          loading={isFetching}
+          dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
           scroll={{ x: 800, y: tableBodyHeight }}
           pagination={{

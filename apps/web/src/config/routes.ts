@@ -2,6 +2,7 @@ import type { Locale } from "@/i18n/config";
 
 export const ROUTES = {
   comments: "/comments",
+  settings: "/settings",
   status: "/status",
 } as const;
 

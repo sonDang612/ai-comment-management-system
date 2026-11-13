@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu, type MenuProps } from "antd";
-import { Activity, type LucideIcon, MessageSquareText } from "lucide-react";
+import { Activity, type LucideIcon, MessageSquareText, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { localizedRoute, ROUTES } from "@/config/routes";
@@ -18,6 +18,7 @@ export function useNavItems(): { items: NavItem[]; current: NavItem | undefined 
   const pathname = usePathname();
   const items: NavItem[] = [
     { href: localizedRoute(locale, ROUTES.comments), label: dict.nav.comments, icon: MessageSquareText },
+    { href: localizedRoute(locale, ROUTES.settings), label: dict.nav.settings, icon: SlidersHorizontal },
     { href: localizedRoute(locale, ROUTES.status), label: dict.nav.status, icon: Activity },
   ];
   return { items, current: items.find((item) => pathname.startsWith(item.href)) };

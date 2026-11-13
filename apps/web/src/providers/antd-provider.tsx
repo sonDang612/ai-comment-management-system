@@ -1,11 +1,12 @@
 "use client";
 
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { App, ConfigProvider } from "antd";
+import { App, ConfigProvider, theme } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import type { ReactNode } from "react";
 import { type Locale, useI18n } from "@/i18n";
+import { useTheme } from "./theme-provider";
 
 const ANTD_LOCALES = {
   "zh-CN": zhCN,
@@ -14,9 +15,13 @@ const ANTD_LOCALES = {
 
 export function AntdProvider({ children }: { children: ReactNode }) {
   const { locale } = useI18n();
+  const scheme = useTheme((state) => state.scheme);
   return (
     <AntdRegistry>
-      <ConfigProvider locale={ANTD_LOCALES[locale]}>
+      <ConfigProvider
+        locale={ANTD_LOCALES[locale]}
+        theme={{ algorithm: scheme === "dark" ? theme.darkAlgorithm : theme.defaultAlgorithm }}
+      >
         <App>{children}</App>
       </ConfigProvider>
     </AntdRegistry>

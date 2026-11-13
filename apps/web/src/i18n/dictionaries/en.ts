@@ -16,6 +16,10 @@ const en: Dictionary = {
     comments: "Comments",
     status: "API status",
   },
+  theme: {
+    switchToDark: "Switch to dark mode",
+    switchToLight: "Switch to light mode",
+  },
   errorPage: {
     title: "Something went wrong",
     description: "An unexpected error occurred. Please try again.",

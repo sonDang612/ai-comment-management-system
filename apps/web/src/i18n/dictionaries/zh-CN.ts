@@ -19,6 +19,10 @@ const zhCN = {
     comments: "评论管理",
     status: "API 状态",
   },
+  theme: {
+    switchToDark: "切换到深色模式",
+    switchToLight: "切换到浅色模式",
+  },
   errorPage: {
     title: "出错了",
     description: "发生了意外错误，请重试。",

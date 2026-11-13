@@ -17,7 +17,7 @@ export function SettingsPage() {
 
   if (isPending) {
     return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         {Array.from({ length: SKELETON_SECTION_COUNT }, (_, index) => (
           <Card key={index}>
             <Skeleton active paragraph={{ rows: 3 }} />
@@ -29,7 +29,7 @@ export function SettingsPage() {
 
   if (error) {
     return (
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="w-full">
         <Alert
           type="error"
           showIcon
@@ -45,7 +45,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       <ValidationSection settings={data} />
       <KeywordsSection settings={data} />
       <LinksSection settings={data} />

@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AiCommentAnalysis, RuleSettings } from '@acms/shared';
+import type { AiCommentAnalysis } from '@acms/shared';
 import { AiAnalysisClient } from '../../infrastructure/ai-service/ai-analysis.client.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import type { Comment } from '../../generated/prisma/client.js';
 import { RuleSettingsService } from '../rule-settings/rule-settings.service.js';
-import { RuleChecker, type RuleViolation, RuleViolationCode } from './rules/rule-checker.js';
+import { RuleChecker, type RuleViolation } from './rules/rule-checker.js';
 
-const MS_PER_MINUTE = 60_000;
 const RULE_MATCH_CONFIDENCE = 1;
 const REASON_SEPARATOR = '；';
 
@@ -37,11 +36,7 @@ export class ModerationService {
   async moderate(comment: Comment): Promise<Comment> {
     let violations: RuleViolation[];
     try {
-      const settings = await this.ruleSettings.get();
-      violations = [
-        ...this.ruleChecker.check(comment.content, settings),
-        ...(await this.checkDuplicate(comment, settings)),
-      ];
+      violations = this.ruleChecker.check(comment.content, await this.ruleSettings.get());
     } catch (error) {
       this.logger.warn(`Rule check failed for comment ${comment.id}, it stays unchecked: ${errorMessage(error)}`);
       return comment;
@@ -56,23 +51,6 @@ export class ModerationService {
       this.logger.warn(`Analysis failed for comment ${comment.id}, it stays unchecked: ${errorMessage(error)}`);
       return comment;
     }
-  }
-
-  private async checkDuplicate(comment: Comment, settings: RuleSettings): Promise<RuleViolation[]> {
-    const { duplicate_detection_enabled, duplicate_window_minutes } = settings.spam;
-    if (!duplicate_detection_enabled || comment.content.trim() === '') return [];
-    const windowStart = new Date(comment.createdAt.getTime() - duplicate_window_minutes * MS_PER_MINUTE);
-    const duplicate = await this.prisma.comment.findFirst({
-      where: { id: { not: comment.id }, content: comment.content, createdAt: { gte: windowStart } },
-      select: { id: true },
-    });
-    if (duplicate === null) return [];
-    return [
-      {
-        code: RuleViolationCode.DUPLICATE_CONTENT,
-        reason: `${duplicate_window_minutes} 分钟内重复提交了相同内容`,
-      },
-    ];
   }
 
   private saveResult(comment: Comment, result: AiCommentAnalysis): Promise<Comment> {

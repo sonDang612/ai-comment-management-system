@@ -91,7 +91,6 @@ const en: Dictionary = {
     invalid: "Fix the highlighted settings first",
     unsavedChanges: "You have unsaved changes",
     characters: "chars",
-    minutes: "min",
     validation: {
       title: "Comment validation",
       description:
@@ -147,15 +146,6 @@ const en: Dictionary = {
       remove: "Remove",
       removeLabel: "Remove {domain}",
       empty: "No domains yet",
-    },
-    spam: {
-      title: "Spam detection",
-      description:
-        "Detect the same comment submitted again within a short time.",
-      duplicateDetection: "Duplicate comment detection",
-      duplicateDetectionHint:
-        "A comment with the same content submitted again within the window is blocked.",
-      duplicateWindow: "Detection time window",
     },
     errors: {
       required: "This field is required",

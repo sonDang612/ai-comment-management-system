@@ -6,10 +6,9 @@ import { apiErrorMessage } from "@/lib/api";
 import { useRuleSettings } from "../api";
 import { KeywordsSection } from "./keywords-section";
 import { LinksSection } from "./links-section";
-import { SpamSection } from "./spam-section";
 import { ValidationSection } from "./validation-section";
 
-const SKELETON_SECTION_COUNT = 4;
+const SKELETON_SECTION_COUNT = 3;
 
 export function SettingsPage() {
   const { dict } = useI18n();
@@ -49,7 +48,6 @@ export function SettingsPage() {
       <ValidationSection settings={data} />
       <KeywordsSection settings={data} />
       <LinksSection settings={data} />
-      <SpamSection settings={data} />
     </div>
   );
 }

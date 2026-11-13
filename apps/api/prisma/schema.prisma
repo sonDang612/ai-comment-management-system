@@ -42,8 +42,6 @@ model RuleSettings {
   allowEmojiOnly            Boolean  @map("allow_emoji_only")
   maxRepeatedChars          Int      @map("max_repeated_chars")
   domainWhitelist           String[] @map("domain_whitelist")
-  duplicateDetectionEnabled Boolean  @map("duplicate_detection_enabled")
-  duplicateWindowMinutes    Int      @map("duplicate_window_minutes")
   createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

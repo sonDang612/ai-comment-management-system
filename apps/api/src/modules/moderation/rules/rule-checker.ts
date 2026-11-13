@@ -24,7 +24,6 @@ export const RuleViolationCode = {
   REPEATED_CHARS: 'repeated_chars',
   RESTRICTED_KEYWORD: 'restricted_keyword',
   LINK_NOT_ALLOWED: 'link_not_allowed',
-  DUPLICATE_CONTENT: 'duplicate_content',
 } as const;
 export type RuleViolationCode = (typeof RuleViolationCode)[keyof typeof RuleViolationCode];
 

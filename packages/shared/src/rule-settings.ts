@@ -34,23 +34,16 @@ export interface LinkSettings {
   domain_whitelist: string[];
 }
 
-export interface SpamDetectionSettings {
-  duplicate_detection_enabled: boolean;
-  duplicate_window_minutes: number;
-}
-
 export interface RuleSettings {
   validation: CommentValidationSettings;
   keywords: RestrictedKeyword[];
   links: LinkSettings;
-  spam: SpamDetectionSettings;
 }
 
 export const RULE_SETTINGS_LIMITS = {
   minLength: { min: 0, max: COMMENT_CONTENT_MAX_LENGTH },
   maxLength: { min: 1, max: COMMENT_CONTENT_MAX_LENGTH },
   maxRepeatedChars: { min: 2, max: 100 },
-  duplicateWindowMinutes: { min: 1, max: 10_080 },
   keywordMaxLength: 100,
   maxKeywords: 500,
   domainMaxLength: 253,

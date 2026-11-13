@@ -114,7 +114,6 @@ export function parseRuleSettings(body: unknown): RuleSettings {
   const root = parser.record(body, 'body');
   const validation = parser.record(root['validation'], 'validation');
   const links = parser.record(root['links'], 'links');
-  const spam = parser.record(root['spam'], 'spam');
 
   const settings: RuleSettings = {
     validation: {
@@ -131,17 +130,6 @@ export function parseRuleSettings(body: unknown): RuleSettings {
     keywords: parser.keywords(root['keywords']),
     links: {
       domain_whitelist: parser.domains(links['domain_whitelist'], 'links.domain_whitelist'),
-    },
-    spam: {
-      duplicate_detection_enabled: parser.boolean(
-        spam['duplicate_detection_enabled'],
-        'spam.duplicate_detection_enabled',
-      ),
-      duplicate_window_minutes: parser.integer(
-        spam['duplicate_window_minutes'],
-        'spam.duplicate_window_minutes',
-        RULE_SETTINGS_LIMITS.duplicateWindowMinutes,
-      ),
     },
   };
 

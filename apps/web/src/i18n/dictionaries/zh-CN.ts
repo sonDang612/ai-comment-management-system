@@ -95,7 +95,6 @@ const zhCN = {
     invalid: "请先修正标红的设置项",
     unsavedChanges: "有未保存的更改",
     characters: "字符",
-    minutes: "分钟",
     validation: {
       title: "评论校验",
       description: "评论内容的基础校验规则，不符合的评论将被拦截。",
@@ -146,13 +145,6 @@ const zhCN = {
       remove: "移除",
       removeLabel: "移除 {domain}",
       empty: "暂无域名",
-    },
-    spam: {
-      title: "垃圾评论检测",
-      description: "识别短时间内重复提交的相同评论。",
-      duplicateDetection: "重复评论检测",
-      duplicateDetectionHint: "在时间窗口内再次提交相同内容的评论将被拦截。",
-      duplicateWindow: "检测时间窗口",
     },
     errors: {
       required: "请填写此项",

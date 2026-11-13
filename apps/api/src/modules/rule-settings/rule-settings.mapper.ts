@@ -32,10 +32,6 @@ export function toRuleSettingsDto(row: RuleSettingsRow | null, keywords: Restric
     links: {
       domain_whitelist: row.domainWhitelist,
     },
-    spam: {
-      duplicate_detection_enabled: row.duplicateDetectionEnabled,
-      duplicate_window_minutes: row.duplicateWindowMinutes,
-    },
   };
 }
 
@@ -47,7 +43,5 @@ export function toRuleSettingsData(settings: RuleSettings): RuleSettingsData {
     allowEmojiOnly: settings.validation.allow_emoji_only,
     maxRepeatedChars: settings.validation.max_repeated_chars,
     domainWhitelist: settings.links.domain_whitelist,
-    duplicateDetectionEnabled: settings.spam.duplicate_detection_enabled,
-    duplicateWindowMinutes: settings.spam.duplicate_window_minutes,
   };
 }

@@ -11,8 +11,4 @@ export const DEFAULT_RULE_SETTINGS: Omit<RuleSettings, 'keywords'> = {
   links: {
     domain_whitelist: [],
   },
-  spam: {
-    duplicate_detection_enabled: false,
-    duplicate_window_minutes: 10,
-  },
 };

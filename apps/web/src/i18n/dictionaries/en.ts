@@ -53,6 +53,8 @@ const en: Dictionary = {
     submitted: "Comment submitted. Moderation result: {status}",
     refresh: "Refresh",
     empty: "No comments yet",
+    searchLabel: "Search comments",
+    searchPlaceholder: "Search comment content",
     filterLabel: "Filter by status",
     filterAll: "All",
     total: "{total} in total",

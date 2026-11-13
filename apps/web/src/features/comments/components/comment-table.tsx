@@ -1,16 +1,24 @@
 "use client";
 
-import { COMMENT_PAGE_SIZES, type CommentDto, CommentStatus } from "@acms/shared";
-import { Alert, Button, Select, Table, type TableColumnsType, Typography } from "antd";
-import { Plus, RotateCw } from "lucide-react";
-import { type CSSProperties, useRef } from "react";
+import {
+  COMMENT_PAGE_SIZES,
+  COMMENT_SEARCH_MAX_LENGTH,
+  type CommentDto,
+  CommentStatus,
+} from "@acms/shared";
+import { Alert, Button, Input, Select, Table, type TableColumnsType, Typography } from "antd";
+import { Plus, RotateCw, Search } from "lucide-react";
+import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime } from "@/lib/datetime";
+import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { useTableBodyHeight } from "@/lib/use-table-body-height";
 import { useComments } from "../api";
 import { type CommentStatusFilter, useCommentsUiStore } from "../store";
 import { CommentStatusTag } from "./comment-status-tag";
+
+const SEARCH_DEBOUNCE_MS = 400;
 
 const STATUS_FILTERS: CommentStatusFilter[] = [
   "all",
@@ -28,10 +36,15 @@ export function CommentTable() {
   const setPagination = useCommentsUiStore((state) => state.setPagination);
   const setStatusFilter = useCommentsUiStore((state) => state.setStatusFilter);
   const openCreate = useCommentsUiStore((state) => state.openCreate);
+  const search = useCommentsUiStore((state) => state.search);
+  const setSearch = useCommentsUiStore((state) => state.setSearch);
+  const [searchInput, setSearchInput] = useState(search);
+  const debouncedSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), SEARCH_DEBOUNCE_MS);
   const { data, error, isPending, isFetching, refetch } = useComments({
     page,
     pageSize,
     status: statusFilter === "all" ? undefined : statusFilter,
+    search: search || undefined,
   });
   const tableWrapperRef = useRef<HTMLDivElement>(null);
   const tableBodyHeight = useTableBodyHeight(
@@ -75,16 +88,34 @@ export function CommentTable() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Select<CommentStatusFilter>
-          value={statusFilter}
-          onChange={setStatusFilter}
-          aria-label={t.filterLabel}
-          className="w-40"
-          options={STATUS_FILTERS.map((filter) => ({
-            value: filter,
-            label: filter === "all" ? t.filterAll : t.status[filter],
-          }))}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            allowClear
+            value={searchInput}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearchInput(value);
+              if (value === "") debouncedSearch.flush(value);
+              else debouncedSearch.schedule(value);
+            }}
+            onPressEnter={() => debouncedSearch.flush(searchInput)}
+            prefix={<Search className="size-4 text-muted-foreground" aria-hidden />}
+            placeholder={t.searchPlaceholder}
+            aria-label={t.searchLabel}
+            maxLength={COMMENT_SEARCH_MAX_LENGTH}
+            className="!w-64"
+          />
+          <Select<CommentStatusFilter>
+            value={statusFilter}
+            onChange={setStatusFilter}
+            aria-label={t.filterLabel}
+            className="w-40"
+            options={STATUS_FILTERS.map((filter) => ({
+              value: filter,
+              label: filter === "all" ? t.filterAll : t.status[filter],
+            }))}
+          />
+        </div>
         <div className="flex items-center gap-2">
           <Button
             icon={<RotateCw className="size-4" aria-hidden />}

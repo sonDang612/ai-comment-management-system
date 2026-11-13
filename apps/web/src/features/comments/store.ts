@@ -9,12 +9,14 @@ interface CommentsUiState {
   page: number;
   pageSize: number;
   statusFilter: CommentStatusFilter;
+  search: string;
   setDraft: (draft: string) => void;
   clearDraft: () => void;
   openCreate: () => void;
   closeCreate: () => void;
   setPagination: (page: number, pageSize: number) => void;
   setStatusFilter: (filter: CommentStatusFilter) => void;
+  setSearch: (search: string) => void;
   showFirstPage: () => void;
 }
 
@@ -24,6 +26,7 @@ export const useCommentsUiStore = create<CommentsUiState>()((set) => ({
   page: 1,
   pageSize: DEFAULT_COMMENT_PAGE_SIZE,
   statusFilter: "all",
+  search: "",
   setDraft: (draft) => set({ draft }),
   clearDraft: () => set({ draft: "" }),
   openCreate: () => set({ isCreateOpen: true }),
@@ -31,5 +34,6 @@ export const useCommentsUiStore = create<CommentsUiState>()((set) => ({
   setPagination: (page, pageSize) =>
     set((state) => ({ page: pageSize === state.pageSize ? page : 1, pageSize })),
   setStatusFilter: (statusFilter) => set({ statusFilter, page: 1 }),
+  setSearch: (search) => set((state) => (state.search === search ? {} : { search, page: 1 })),
   showFirstPage: () => set({ page: 1 }),
 }));

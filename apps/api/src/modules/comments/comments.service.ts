@@ -19,8 +19,11 @@ export class CommentsService {
     return toCommentDto(moderated);
   }
 
-  async list({ page, pageSize, status }: CommentListParams): Promise<CommentListResponse> {
-    const where: Prisma.CommentWhereInput = status === undefined ? {} : { status };
+  async list({ page, pageSize, status, search }: CommentListParams): Promise<CommentListResponse> {
+    const where: Prisma.CommentWhereInput = {
+      ...(status === undefined ? {} : { status }),
+      ...(search === undefined ? {} : { content: { contains: search, mode: 'insensitive' } }),
+    };
     const [total, comments] = await this.prisma.$transaction([
       this.prisma.comment.count({ where }),
       this.prisma.comment.findMany({

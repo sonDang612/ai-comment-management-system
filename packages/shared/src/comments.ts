@@ -34,11 +34,13 @@ export interface CommentDto {
 export const COMMENT_PAGE_SIZES = [20, 50, 100] as const;
 export const DEFAULT_COMMENT_PAGE_SIZE = 20;
 export const MAX_COMMENT_PAGE_SIZE = 100;
+export const COMMENT_SEARCH_MAX_LENGTH = 200;
 
 export interface CommentListQuery {
   page?: number;
   page_size?: number;
   status?: CommentStatus;
+  q?: string;
 }
 
 export interface CommentListResponse {

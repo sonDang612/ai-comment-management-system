@@ -14,6 +14,7 @@ export interface CommentListParams {
   page: number;
   pageSize: number;
   status?: CommentStatus;
+  search?: string;
 }
 
 export const commentKeys = {
@@ -27,7 +28,12 @@ export function commentListQueryOptions(params: CommentListParams) {
     queryKey: commentKeys.list(params),
     queryFn: () =>
       apiClient.get<CommentListResponse>(COMMENTS_PATH, {
-        query: { page: params.page, page_size: params.pageSize, status: params.status },
+        query: {
+          page: params.page,
+          page_size: params.pageSize,
+          status: params.status,
+          q: params.search,
+        },
       }),
     placeholderData: keepPreviousData,
   });

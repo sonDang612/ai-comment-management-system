@@ -57,6 +57,8 @@ const zhCN = {
     submitted: "评论已提交，审核结果：{status}",
     refresh: "刷新",
     empty: "暂无评论",
+    searchLabel: "搜索评论",
+    searchPlaceholder: "搜索评论内容",
     filterLabel: "按状态筛选",
     filterAll: "全部",
     total: "共 {total} 条",

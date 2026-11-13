@@ -1,5 +1,6 @@
 import {
   COMMENT_CONTENT_MAX_LENGTH,
+  COMMENT_SEARCH_MAX_LENGTH,
   CommentStatus,
   type CreateCommentRequest,
   DEFAULT_COMMENT_PAGE_SIZE,
@@ -11,12 +12,14 @@ export interface CommentListParams {
   page: number;
   pageSize: number;
   status: CommentStatus | undefined;
+  search: string | undefined;
 }
 
 export interface RawCommentListQuery {
   page?: string;
   page_size?: string;
   status?: string;
+  q?: string;
 }
 
 const COMMENT_STATUSES = new Set<string>(Object.values(CommentStatus));
@@ -61,10 +64,22 @@ function parseStatus(raw: string | undefined): CommentStatus | undefined {
   return raw as CommentStatus;
 }
 
+function parseSearch(raw: string | undefined): string | undefined {
+  const search = typeof raw === 'string' ? raw.trim() : '';
+  if (search === '') return undefined;
+  if (search.length > COMMENT_SEARCH_MAX_LENGTH) {
+    throw new ValidationException(`q must be at most ${COMMENT_SEARCH_MAX_LENGTH} characters`, [
+      { field: 'q', rule: 'max_length', max: COMMENT_SEARCH_MAX_LENGTH },
+    ]);
+  }
+  return search;
+}
+
 export function parseCommentListQuery(query: RawCommentListQuery): CommentListParams {
   return {
     page: parsePositiveInt('page', query.page, 1),
     pageSize: parsePositiveInt('page_size', query.page_size, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE),
     status: parseStatus(query.status),
+    search: parseSearch(query.q),
   };
 }

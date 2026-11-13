@@ -2,7 +2,6 @@ import {
   API_V1_PREFIX,
   type CommentDto,
   type CommentListResponse,
-  type CommentStatus,
   type CreateCommentRequest,
 } from "@acms/shared";
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +12,7 @@ const COMMENTS_PATH = `${API_V1_PREFIX}/comments`;
 export interface CommentListParams {
   page: number;
   pageSize: number;
-  status?: CommentStatus;
+  isValid?: boolean;
   search?: string;
 }
 
@@ -31,7 +30,7 @@ export function commentListQueryOptions(params: CommentListParams) {
         query: {
           page: params.page,
           page_size: params.pageSize,
-          status: params.status,
+          is_valid: params.isValid,
           q: params.search,
         },
       }),

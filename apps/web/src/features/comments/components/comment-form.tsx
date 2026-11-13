@@ -29,7 +29,9 @@ export function CreateCommentModal() {
           clearDraft();
           closeCreate();
           showFirstPage();
-          message.success(format(t.submitted, { status: t.status[comment.status] }));
+          const result =
+            comment.is_valid === null ? t.validity.unchecked : comment.is_valid ? t.validity.valid : t.validity.invalid;
+          message.success(format(t.submitted, { result }));
         },
         onError: (error) => {
           message.error(apiErrorMessage(error, dict));

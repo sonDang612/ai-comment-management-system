@@ -1,6 +1,7 @@
 export { commentKeys, commentListQueryOptions, useComments, useCreateComment } from "./api";
+export { CheckResultTag } from "./components/check-result-tag";
+export { CommentDetailModal } from "./components/comment-detail-modal";
 export { CreateCommentModal } from "./components/comment-form";
-export { CommentStatusTag } from "./components/comment-status-tag";
 export { CommentTable } from "./components/comment-table";
 export { CommentsPage } from "./components/comments-page";
 export { useCommentsUiStore } from "./store";

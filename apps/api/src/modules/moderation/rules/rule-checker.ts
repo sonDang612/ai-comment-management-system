@@ -31,7 +31,6 @@ export type RuleViolationCode = (typeof RuleViolationCode)[keyof typeof RuleViol
 export interface RuleViolation {
   code: RuleViolationCode;
   reason: string;
-  keywordId?: string;
 }
 
 @Injectable()
@@ -89,7 +88,6 @@ export class RuleChecker {
       .map((keyword) => ({
         code: RuleViolationCode.RESTRICTED_KEYWORD,
         reason: `命中限制关键词“${keyword.keyword}”`,
-        keywordId: keyword.id,
       }));
   }
 

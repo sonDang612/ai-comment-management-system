@@ -25,8 +25,6 @@ export interface Env {
   AI_SERVICE_URL: string;
   AI_SERVICE_TOKEN: string;
   AI_SERVICE_TIMEOUT_MS: number;
-  MODERATION_AUTO_APPROVE_THRESHOLD: number;
-  MODERATION_AUTO_DISABLE_THRESHOLD: number;
 }
 
 type Raw = Record<string, unknown>;
@@ -49,16 +47,6 @@ class EnvReader {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 0) {
       this.errors.push(`${key} must be a non-negative integer`);
-    }
-    return parsed;
-  }
-
-  ratio(key: string, fallback: number): number {
-    const value = this.raw[key];
-    if (value === undefined || value === '') return fallback;
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
-      this.errors.push(`${key} must be a number between 0 and 1`);
     }
     return parsed;
   }
@@ -104,8 +92,6 @@ export function validateEnv(raw: Raw): Env {
     AI_SERVICE_URL: env.url('AI_SERVICE_URL', ['http:', 'https:'], 'http://localhost:8000'),
     AI_SERVICE_TOKEN: env.string('AI_SERVICE_TOKEN'),
     AI_SERVICE_TIMEOUT_MS: env.int('AI_SERVICE_TIMEOUT_MS', 10_000),
-    MODERATION_AUTO_APPROVE_THRESHOLD: env.ratio('MODERATION_AUTO_APPROVE_THRESHOLD', 0.85),
-    MODERATION_AUTO_DISABLE_THRESHOLD: env.ratio('MODERATION_AUTO_DISABLE_THRESHOLD', 0.9),
   };
   if (env.errors.length > 0) {
     throw new Error(`Invalid environment configuration:\n  - ${env.errors.join('\n  - ')}`);

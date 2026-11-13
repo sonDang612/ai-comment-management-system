@@ -1,27 +1,21 @@
-import {
-  COMMENT_SEARCH_MAX_LENGTH,
-  CommentStatus,
-  DEFAULT_COMMENT_PAGE_SIZE,
-  MAX_COMMENT_PAGE_SIZE,
-} from '@acms/shared';
+import { COMMENT_SEARCH_MAX_LENGTH, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE } from '@acms/shared';
 import { ValidationException } from '../../common/errors/app.exception.js';
 
 export interface CommentListParams {
   page: number;
   pageSize: number;
-  status: CommentStatus | undefined;
+  isValid: boolean | undefined;
   search: string | undefined;
 }
 
 export interface RawCommentListQuery {
   page?: string;
   page_size?: string;
-  status?: string;
+  is_valid?: string;
   q?: string;
 }
 
-const COMMENT_STATUSES = new Set<string>(Object.values(CommentStatus));
-
+const BOOLEAN_VALUES: Record<string, boolean> = { true: true, false: false };
 
 function parsePositiveInt(field: string, raw: string | undefined, fallback: number, max?: number): number {
   if (raw === undefined || raw === '') return fallback;
@@ -35,14 +29,15 @@ function parsePositiveInt(field: string, raw: string | undefined, fallback: numb
   return value;
 }
 
-function parseStatus(raw: string | undefined): CommentStatus | undefined {
+function parseBoolean(field: string, raw: string | undefined): boolean | undefined {
   if (raw === undefined || raw === '') return undefined;
-  if (!COMMENT_STATUSES.has(raw)) {
-    throw new ValidationException(`status must be one of: ${[...COMMENT_STATUSES].join(', ')}`, [
-      { field: 'status', rule: 'enum', allowed: [...COMMENT_STATUSES] },
+  const value = BOOLEAN_VALUES[raw];
+  if (value === undefined) {
+    throw new ValidationException(`${field} must be true or false`, [
+      { field, rule: 'enum', allowed: Object.keys(BOOLEAN_VALUES) },
     ]);
   }
-  return raw as CommentStatus;
+  return value;
 }
 
 function parseSearch(raw: string | undefined): string | undefined {
@@ -60,7 +55,7 @@ export function parseCommentListQuery(query: RawCommentListQuery): CommentListPa
   return {
     page: parsePositiveInt('page', query.page, 1),
     pageSize: parsePositiveInt('page_size', query.page_size, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE),
-    status: parseStatus(query.status),
+    isValid: parseBoolean('is_valid', query.is_valid),
     search: parseSearch(query.q),
   };
 }

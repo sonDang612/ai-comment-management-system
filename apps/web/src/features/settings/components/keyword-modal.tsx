@@ -87,7 +87,7 @@ export function KeywordModal({
             <Select
               options={Object.values(KeywordAction).map((action) => ({
                 value: action,
-                label: dict.comments.status[action],
+                label: t.actions[action],
               }))}
             />
           </Form.Item>

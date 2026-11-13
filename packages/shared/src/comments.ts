@@ -1,18 +1,3 @@
-export const CommentStatus = {
-  APPROVED: 'approved',
-  PENDING: 'pending',
-  DISABLED: 'disabled',
-} as const;
-export type CommentStatus = (typeof CommentStatus)[keyof typeof CommentStatus];
-
-export const DecidedBy = {
-  WHITELIST: 'whitelist',
-  RULE_FILTER: 'rule_filter',
-  AI_MODEL: 'ai_model',
-  ADMIN: 'admin',
-} as const;
-export type DecidedBy = (typeof DecidedBy)[keyof typeof DecidedBy];
-
 export const COMMENT_CONTENT_MAX_LENGTH = 10_000;
 
 export interface CreateCommentRequest {
@@ -22,10 +7,10 @@ export interface CreateCommentRequest {
 export interface CommentDto {
   id: string;
   content: string;
-  status: CommentStatus;
-  reason: string | null;
+  is_valid: boolean | null;
+  is_question: boolean | null;
   confidence: number | null;
-  decided_by: DecidedBy | null;
+  reason: string | null;
   moderated_at: string | null;
   created_at: string;
   updated_at: string;
@@ -39,7 +24,7 @@ export const COMMENT_SEARCH_MAX_LENGTH = 200;
 export interface CommentListQuery {
   page?: number;
   page_size?: number;
-  status?: CommentStatus;
+  is_valid?: boolean;
   q?: string;
 }
 
@@ -49,8 +34,6 @@ export interface CommentListResponse {
   page: number;
   page_size: number;
 }
-
-export const QUESTION_LABEL = '需人工回复';
 
 export interface AiCommentAnalysisRequest {
   comment_id: string;

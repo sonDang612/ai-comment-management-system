@@ -1,20 +1,25 @@
 "use client";
 
 import {
+  KeywordAction,
   keywordIdentity,
   NEW_RESTRICTED_KEYWORD_DEFAULTS,
   RULE_SETTINGS_LIMITS,
   type RestrictedKeyword,
   type RestrictedKeywordDraft,
 } from "@acms/shared";
-import { Button, Popconfirm, Switch, Table, type TableColumnsType, Tooltip } from "antd";
+import { Button, Popconfirm, Switch, Table, type TableColumnsType, Tag, Tooltip } from "antd";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { CommentStatusTag } from "@/features/comments";
 import { format, useI18n } from "@/i18n";
 import { useSettingsUiStore } from "../store";
 import { KeywordModal } from "./keyword-modal";
 
 const KEYWORD_PAGE_SIZE = 10;
+
+const KEYWORD_ACTION_COLORS: Record<KeywordAction, string> = {
+  [KeywordAction.DISABLED]: "error",
+  [KeywordAction.PENDING]: "warning",
+};
 
 function createKeywordId(): string {
   return typeof crypto.randomUUID === "function"
@@ -69,7 +74,9 @@ export function KeywordTable({ value = [], onChange }: KeywordTableProps) {
       key: "action",
       title: t.action,
       width: 110,
-      render: (_, keyword) => <CommentStatusTag status={keyword.action} />,
+      render: (_, keyword) => (
+        <Tag color={KEYWORD_ACTION_COLORS[keyword.action]}>{t.actions[keyword.action]}</Tag>
+      ),
     },
     {
       key: "enabled",

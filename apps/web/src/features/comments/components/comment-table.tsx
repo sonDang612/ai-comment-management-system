@@ -1,13 +1,8 @@
 "use client";
 
-import {
-  COMMENT_PAGE_SIZES,
-  COMMENT_SEARCH_MAX_LENGTH,
-  type CommentDto,
-  CommentStatus,
-} from "@acms/shared";
+import { COMMENT_PAGE_SIZES, COMMENT_SEARCH_MAX_LENGTH, type CommentDto } from "@acms/shared";
 import { Alert, Button, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
-import { Plus, RotateCw, Search } from "lucide-react";
+import { Eye, Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
 import { apiErrorMessage } from "@/lib/api";
@@ -15,8 +10,8 @@ import { formatDateTime } from "@/lib/datetime";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { useTableBodyHeight } from "@/lib/use-table-body-height";
 import { useComments } from "../api";
-import { type CommentStatusFilter, useCommentsUiStore } from "../store";
-import { CommentStatusTag } from "./comment-status-tag";
+import { type CommentValidityFilter, useCommentsUiStore } from "../store";
+import { CheckResultTag } from "./check-result-tag";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const SKELETON_ROW_COUNT = 8;
@@ -38,23 +33,21 @@ function isSkeletonRow(row: CommentRow): row is SkeletonRow {
 }
 
 const textSkeleton = <Skeleton.Input active size="small" block />;
+const tagSkeleton = <Skeleton.Button active size="small" />;
 
-const STATUS_FILTERS: CommentStatusFilter[] = [
-  "all",
-  CommentStatus.APPROVED,
-  CommentStatus.PENDING,
-  CommentStatus.DISABLED,
-];
+const VALIDITY_FILTERS: CommentValidityFilter[] = ["all", "valid", "invalid"];
+const CONFIDENCE_FRACTION_DIGITS = 2;
 
 export function CommentTable() {
   const { dict, locale } = useI18n();
   const t = dict.comments;
   const page = useCommentsUiStore((state) => state.page);
   const pageSize = useCommentsUiStore((state) => state.pageSize);
-  const statusFilter = useCommentsUiStore((state) => state.statusFilter);
+  const validityFilter = useCommentsUiStore((state) => state.validityFilter);
   const setPagination = useCommentsUiStore((state) => state.setPagination);
-  const setStatusFilter = useCommentsUiStore((state) => state.setStatusFilter);
+  const setValidityFilter = useCommentsUiStore((state) => state.setValidityFilter);
   const openCreate = useCommentsUiStore((state) => state.openCreate);
+  const openDetail = useCommentsUiStore((state) => state.openDetail);
   const search = useCommentsUiStore((state) => state.search);
   const setSearch = useCommentsUiStore((state) => state.setSearch);
   const [searchInput, setSearchInput] = useState(search);
@@ -62,7 +55,7 @@ export function CommentTable() {
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useComments({
     page,
     pageSize,
-    status: statusFilter === "all" ? undefined : statusFilter,
+    isValid: validityFilter === "all" ? undefined : validityFilter === "valid",
     search: search || undefined,
   });
   const isLoadingRows = isPending || isPlaceholderData;
@@ -89,27 +82,56 @@ export function CommentTable() {
         ),
     },
     {
-      key: "status",
-      title: t.columns.status,
-      width: 110,
+      key: "is_valid",
+      title: t.columns.isValid,
+      width: 100,
       render: (_, row) =>
         isSkeletonRow(row) ? (
-          <Skeleton.Button active size="small" />
+          tagSkeleton
         ) : (
-          <CommentStatusTag status={row.status} />
+          <CheckResultTag
+            value={row.is_valid}
+            trueLabel={t.validity.valid}
+            falseLabel={t.validity.invalid}
+            trueColor="success"
+            falseColor="error"
+          />
         ),
     },
     {
-      key: "reason",
-      title: t.columns.reason,
-      width: 260,
-      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : (row.reason ?? "-")),
+      key: "confidence",
+      title: t.columns.confidence,
+      width: 130,
+      render: (_, row) =>
+        isSkeletonRow(row)
+          ? textSkeleton
+          : (row.confidence?.toFixed(CONFIDENCE_FRACTION_DIGITS) ?? "-"),
     },
     {
       key: "created_at",
       title: t.columns.createdAt,
       width: 190,
       render: (_, row) => (isSkeletonRow(row) ? textSkeleton : formatDateTime(row.created_at, locale)),
+    },
+    {
+      key: "actions",
+      title: t.columns.actions,
+      width: 100,
+      fixed: "right",
+      render: (_, row) =>
+        isSkeletonRow(row) ? (
+          tagSkeleton
+        ) : (
+          <Button
+            type="link"
+            size="small"
+            className="!px-0"
+            icon={<Eye className="size-4" aria-hidden />}
+            onClick={() => openDetail(row)}
+          >
+            {t.details}
+          </Button>
+        ),
     },
   ];
 
@@ -133,14 +155,14 @@ export function CommentTable() {
             maxLength={COMMENT_SEARCH_MAX_LENGTH}
             className="!w-64"
           />
-          <Select<CommentStatusFilter>
-            value={statusFilter}
-            onChange={setStatusFilter}
+          <Select<CommentValidityFilter>
+            value={validityFilter}
+            onChange={setValidityFilter}
             aria-label={t.filterLabel}
             className="w-40"
-            options={STATUS_FILTERS.map((filter) => ({
+            options={VALIDITY_FILTERS.map((filter) => ({
               value: filter,
-              label: filter === "all" ? t.filterAll : t.status[filter],
+              label: filter === "all" ? t.filterAll : t.validity[filter],
             }))}
           />
         </div>

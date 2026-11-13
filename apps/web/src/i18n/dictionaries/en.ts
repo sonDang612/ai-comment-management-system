@@ -51,25 +51,34 @@ const en: Dictionary = {
     create: "Post a comment",
     submit: "Submit",
     cancel: "Cancel",
-    submitted: "Comment submitted. Moderation result: {status}",
+    submitted: "Comment submitted. Check result: {result}",
     refresh: "Refresh",
     empty: "No comments yet",
     searchLabel: "Search comments",
     searchPlaceholder: "Search comment content",
-    filterLabel: "Filter by status",
+    filterLabel: "Filter by check result",
     filterAll: "All",
     total: "{total} in total",
     loadFailed: "Failed to load comments: {message}",
+    yes: "Yes",
+    no: "No",
+    details: "Details",
+    detailTitle: "Comment details",
     columns: {
       content: "Content",
-      status: "Status",
+      isValid: "Valid",
+      isQuestion: "Question",
+      confidence: "Confidence",
       reason: "Reason",
       createdAt: "Submitted at",
+      checkedAt: "Checked at",
+      id: "Comment ID",
+      actions: "Actions",
     },
-    status: {
-      approved: "Approved",
-      pending: "Pending",
-      disabled: "Disabled",
+    validity: {
+      valid: "Valid",
+      invalid: "Invalid",
+      unchecked: "Unchecked",
     },
   },
   settings: {
@@ -85,19 +94,23 @@ const en: Dictionary = {
     minutes: "min",
     validation: {
       title: "Comment validation",
-      description: "Basic checks on comment content. Comments that fail them are blocked.",
+      description:
+        "Basic checks on comment content. Comments that fail them are blocked.",
       minLength: "Minimum comment length",
       maxLength: "Maximum comment length",
       maxRepeatedChars: "Maximum consecutive repeated characters",
-      maxRepeatedCharsHint: "A character repeated in a row more than this many times is a violation.",
+      maxRepeatedCharsHint:
+        "A character repeated in a row more than this many times is a violation.",
       allowEmpty: "Allow empty comments",
       allowEmptyHint: "When off, blank comments are blocked.",
       allowEmojiOnly: "Allow emoji-only comments",
-      allowEmojiOnlyHint: "When off, comments that contain only emoji are blocked.",
+      allowEmojiOnlyHint:
+        "When off, comments that contain only emoji are blocked.",
     },
     keywords: {
       title: "Restricted keywords",
-      description: "Comments that match an enabled keyword get the keyword's action.",
+      description:
+        "Comments that match an enabled keyword get the keyword's action.",
       add: "Add keyword",
       addTitle: "Add keyword",
       editTitle: "Edit keyword",
@@ -109,14 +122,18 @@ const en: Dictionary = {
       operations: "Actions",
       edit: "Edit",
       delete: "Delete",
-      deleteConfirm: "Delete the keyword \"{keyword}\"?",
-      toggleLabel: "Enable the keyword \"{keyword}\"",
+      deleteConfirm: 'Delete the keyword "{keyword}"?',
+      toggleLabel: 'Enable the keyword "{keyword}"',
       empty: "No keywords yet",
       total: "{total} in total",
       limitReached: "You can add at most {max} keywords",
       matchModes: {
         exact: "Exact",
         contains: "Contains",
+      },
+      actions: {
+        disabled: "Disabled",
+        pending: "Pending",
       },
     },
     links: {
@@ -133,15 +150,18 @@ const en: Dictionary = {
     },
     spam: {
       title: "Spam detection",
-      description: "Detect the same comment submitted again within a short time.",
+      description:
+        "Detect the same comment submitted again within a short time.",
       duplicateDetection: "Duplicate comment detection",
-      duplicateDetectionHint: "A comment with the same content submitted again within the window is blocked.",
+      duplicateDetectionHint:
+        "A comment with the same content submitted again within the window is blocked.",
       duplicateWindow: "Detection time window",
     },
     errors: {
       required: "This field is required",
       integerRange: "Enter a whole number from {min} to {max}",
-      minExceedsMax: "The maximum length must not be less than the minimum length",
+      minExceedsMax:
+        "The maximum length must not be less than the minimum length",
       keywordRequired: "Enter a keyword",
       keywordTooLong: "A keyword can have at most {max} characters",
       keywordDuplicate: "This keyword already exists",

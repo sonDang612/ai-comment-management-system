@@ -40,11 +40,12 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
   It only does AI work (normalization, rule filter, model inference). Any data it needs comes from the API
   over HTTP or in the job payload.
-- `apps/ai` returns analysis only (`is_valid`, `is_question`, `confidence`, `reason`), never a
-  business decision. The API (`ModerationPolicy`) maps the analysis to `approved` / `pending` / `disabled`
-  with the thresholds, labels and priority rules.
+- This system only checks comments: it stores and returns `content`, `is_valid`, `is_question`, `confidence` and
+  `reason`. It has no comment status (`approved` / `pending` / `disabled`) and no decision source; the integrating
+  system decides what to do with the result.
 - Rule-based checks (from the admin rule settings) run in the API (`modules/moderation/rules`) before the AI.
-  The AI is called only when every rule passes; a failed rule decides the comment with `decided_by = rule_filter`.
+  The AI is called only when every rule passes; a failed rule stores `is_valid = false` with confidence 1.0.
+  When the rule check or the AI fails, the result fields stay `null` (unchecked).
 - API: controllers stay thin, logic lives in services, infrastructure clients live in `src/infrastructure`.
   Throw `AppException` subclasses, never raw errors.
 - AI: shared code in `core/` and `modules/`. `core` never imports `server` or `worker`, and `server` and `worker`
@@ -60,6 +61,9 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - Public endpoints are versioned under `/api/v1`. Breaking changes go into a new version only.
 
 ## Moderation business rules (from the docs)
+
+The rules below come from the docs. Where they mention statuses, decisions, `decided_by` or audit history, the
+current scope above takes precedence: those parts belong to the integrating system.
 
 - Three decisions only: `approved` (通过), `disabled` (禁用), `pending` (待处理). New comments start as `pending`.
 - The AI never writes or posts replies (D-17). No RAG, no knowledge base.

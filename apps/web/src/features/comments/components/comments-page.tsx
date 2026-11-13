@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "antd";
+import { CommentDetailModal } from "./comment-detail-modal";
 import { CreateCommentModal } from "./comment-form";
 import { CommentTable } from "./comment-table";
 
@@ -11,6 +12,7 @@ export function CommentsPage() {
         <CommentTable />
       </Card>
       <CreateCommentModal />
+      <CommentDetailModal />
     </>
   );
 }

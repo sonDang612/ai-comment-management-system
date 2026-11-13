@@ -19,9 +19,9 @@ export class CommentsService {
     return toCommentDto(moderated);
   }
 
-  async list({ page, pageSize, status, search }: CommentListParams): Promise<CommentListResponse> {
+  async list({ page, pageSize, isValid, search }: CommentListParams): Promise<CommentListResponse> {
     const where: Prisma.CommentWhereInput = {
-      ...(status === undefined ? {} : { status }),
+      ...(isValid === undefined ? {} : { isValid }),
       ...(search === undefined ? {} : { content: { contains: search, mode: 'insensitive' } }),
     };
     const [total, comments] = await this.prisma.$transaction([

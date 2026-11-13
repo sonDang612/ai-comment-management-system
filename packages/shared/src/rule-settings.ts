@@ -1,4 +1,4 @@
-import { COMMENT_CONTENT_MAX_LENGTH, CommentStatus } from './comments.js';
+import { COMMENT_CONTENT_MAX_LENGTH } from './comments.js';
 
 export const KeywordMatchMode = {
   EXACT: 'exact',
@@ -7,8 +7,8 @@ export const KeywordMatchMode = {
 export type KeywordMatchMode = (typeof KeywordMatchMode)[keyof typeof KeywordMatchMode];
 
 export const KeywordAction = {
-  DISABLED: CommentStatus.DISABLED,
-  PENDING: CommentStatus.PENDING,
+  DISABLED: 'disabled',
+  PENDING: 'pending',
 } as const;
 export type KeywordAction = (typeof KeywordAction)[keyof typeof KeywordAction];
 

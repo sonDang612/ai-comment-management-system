@@ -5,10 +5,10 @@ export function toCommentDto(comment: Comment): CommentDto {
   return {
     id: comment.id,
     content: comment.content,
-    status: comment.status,
-    reason: comment.reason,
+    is_valid: comment.isValid,
+    is_question: comment.isQuestion,
     confidence: comment.confidence === null ? null : comment.confidence.toNumber(),
-    decided_by: comment.decidedBy,
+    reason: comment.reason,
     moderated_at: comment.moderatedAt?.toISOString() ?? null,
     created_at: comment.createdAt.toISOString(),
     updated_at: comment.updatedAt.toISOString(),

@@ -37,6 +37,45 @@ enum DecidedBy {
   @@map("decided_by")
 }
 
+enum KeywordMatchMode {
+  exact
+  contains
+
+  @@map("keyword_match_mode")
+}
+
+model RuleSettings {
+  id                        Int      @id @default(1) @db.SmallInt
+  minLength                 Int      @map("min_length")
+  maxLength                 Int      @map("max_length")
+  allowEmpty                Boolean  @map("allow_empty")
+  allowEmojiOnly            Boolean  @map("allow_emoji_only")
+  maxRepeatedChars          Int      @map("max_repeated_chars")
+  allowLinks                Boolean  @map("allow_links")
+  domainWhitelist           String[] @map("domain_whitelist")
+  domainBlacklist           String[] @map("domain_blacklist")
+  duplicateDetectionEnabled Boolean  @map("duplicate_detection_enabled")
+  duplicateWindowMinutes    Int      @map("duplicate_window_minutes")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("rule_settings")
+}
+
+model RestrictedKeyword {
+  id        String           @id @default(uuid()) @db.Uuid
+  keyword   String
+  matchMode KeywordMatchMode @map("match_mode")
+  action    CommentStatus
+  enabled   Boolean          @default(true)
+  position  Int
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([position])
+  @@map("restricted_keywords")
+}
+
 model Comment {
   id          String               @id @default(uuid()) @db.Uuid
   content     String

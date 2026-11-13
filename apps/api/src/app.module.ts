@@ -11,6 +11,7 @@ import { QueueModule } from './infrastructure/queue/queue.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
 import { CommentsModule } from './modules/comments/comments.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { RuleSettingsModule } from './modules/rule-settings/rule-settings.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { HealthModule } from './modules/health/health.module.js';
     // Feature modules
     HealthModule,
     CommentsModule,
+    RuleSettingsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

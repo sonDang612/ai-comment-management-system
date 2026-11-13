@@ -1,3 +1,4 @@
+import { isApiResponse } from "@acms/shared";
 import { env } from "@/config/env";
 import { logger } from "@/lib/logger";
 import { ApiError } from "./errors";
@@ -53,7 +54,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  const responseBody: unknown = await response.json();
+  if (!isApiResponse(responseBody)) {
+    logger.warn("API response without envelope", { path, status: response.status });
+    throw ApiError.invalidResponse(response.status, response.headers.get("x-request-id"));
+  }
+  return responseBody.data as T;
 }
 
 /** Thin typed facade over `request`, used by feature modules. */

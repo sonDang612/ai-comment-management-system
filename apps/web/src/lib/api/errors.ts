@@ -39,7 +39,7 @@ export class ApiError extends Error {
       return new ApiError({
         status: response.status,
         code: body.error.code,
-        message: body.error.message,
+        message: body.message,
         details: body.error.details,
         requestId: body.error.request_id ?? requestId,
       });
@@ -48,6 +48,15 @@ export class ApiError extends Error {
       status: response.status,
       code: response.status >= 500 ? ErrorCode.INTERNAL_ERROR : ErrorCode.BAD_REQUEST,
       message: response.statusText || `Request failed with status ${response.status}`,
+      requestId,
+    });
+  }
+
+  static invalidResponse(status: number, requestId: string | null): ApiError {
+    return new ApiError({
+      status,
+      code: ErrorCode.INTERNAL_ERROR,
+      message: "Response body does not match the API envelope",
       requestId,
     });
   }

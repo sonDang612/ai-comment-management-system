@@ -46,7 +46,11 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - Web: server state in TanStack Query, client UI state in Zustand, one folder per feature in `src/features/<name>`,
   pages under `src/app/[lang]/`.
 - Shared TS contracts (error envelope, queue and job names) live in `packages/shared`. Reuse them instead of redefining them.
-- Every error response uses the envelope `{ "error": { "code", "message", "details", "request_id" } }`.
+- Every HTTP response from the API and from the AI server uses the envelope
+  `{ "code", "message", "data", "timestamp" }`: `code` is the HTTP status, `message` is `"Success"` on 2xx,
+  `timestamp` is ISO 8601 UTC. Errors set `data: null` and add `"error": { "code", "details", "request_id" }`
+  with the machine-readable error code. NestJS wraps responses in `ResponseEnvelopeInterceptor` (services and
+  controllers return plain data); Python routers return `success(...)` from `acms_ai.core.responses`.
 - Public endpoints are versioned under `/api/v1`. Breaking changes go into a new version only.
 
 ## Moderation business rules (from the docs)

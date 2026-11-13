@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isApiErrorBody } from '@acms/shared';
+import { isApiErrorBody, isApiResponse } from '@acms/shared';
 import { REQUEST_ID_HEADER, RequestContext } from '../../common/context/request-context.js';
 import { ServiceUnavailableException } from '../../common/errors/app.exception.js';
 import type { Env } from '../../config/env.js';
@@ -62,6 +62,10 @@ export class AiServiceClient {
       this.logger.warn(`AI service error (${method} ${path}): ${response.status} ${upstream}`);
       throw new ServiceUnavailableException('AI service request failed');
     }
-    return payload as T;
+    if (!isApiResponse(payload)) {
+      this.logger.warn(`AI service returned a body without the response envelope (${method} ${path})`);
+      throw new ServiceUnavailableException('AI service returned an invalid response');
+    }
+    return payload.data as T;
   }
 }

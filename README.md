@@ -188,10 +188,20 @@ Values that must agree across files:
 
 ## Cross-cutting conventions
 
-**Errors.** Every non-2xx response, from the API and from the AI server, uses the same envelope:
+**Response envelope.** Every response, from the API and from the AI server, uses the same envelope.
+`code` is the HTTP status and `timestamp` is ISO 8601 UTC:
 
 ```json
-{ "error": { "code": "not_found", "message": "…", "details": null, "request_id": "…" } }
+{ "code": 200, "message": "Success", "data": { }, "timestamp": "2026-11-13T13:00:00.000Z" }
+```
+
+Clients read `data`. In the API, `ResponseEnvelopeInterceptor` wraps what controllers return. In the AI server,
+routers return `success(...)` from `acms_ai.core.responses`.
+
+**Errors.** Errors use the same envelope with `data: null`, plus the machine-readable error code:
+
+```json
+{ "code": 404, "message": "…", "data": null, "error": { "code": "not_found", "details": null, "request_id": "…" }, "timestamp": "…" }
 ```
 
 - API: throw an `AppException` subclass (`NotFoundException`, `ConflictException`, …) from

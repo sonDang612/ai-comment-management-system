@@ -19,3 +19,56 @@ datasource db {
 }
 
 // Models are added together with the business features that need them.
+
+enum CommentStatus {
+  approved
+  pending
+  disabled
+
+  @@map("comment_status")
+}
+
+enum DecidedBy {
+  whitelist
+  rule_filter
+  ai_model
+  admin
+
+  @@map("decided_by")
+}
+
+model Comment {
+  id          String               @id @default(uuid()) @db.Uuid
+  content     String
+  status      CommentStatus        @default(pending)
+  reason      String?
+  confidence  Decimal?             @db.Decimal(3, 2)
+  decidedBy   DecidedBy?           @map("decided_by")
+  moderatedAt DateTime?            @map("moderated_at") @db.Timestamptz(3)
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  decisions   ModerationDecision[]
+
+  @@index([createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+model ModerationDecision {
+  id                String        @id @default(uuid()) @db.Uuid
+  commentId         String        @map("comment_id") @db.Uuid
+  normalizedContent String        @map("normalized_content")
+  decision          CommentStatus
+  category          String?
+  violationType     String?       @map("violation_type")
+  labels            String[]
+  confidence        Decimal       @db.Decimal(3, 2)
+  reason            String
+  decidedBy         DecidedBy     @map("decided_by")
+  modelVersion      String        @map("model_version")
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  comment           Comment       @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId, createdAt])
+  @@index([createdAt])
+  @@map("moderation_decisions")
+}

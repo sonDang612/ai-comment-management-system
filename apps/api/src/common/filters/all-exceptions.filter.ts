@@ -50,12 +50,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     const body: ApiErrorBody = {
+      code: error.status,
+      message: error.message,
+      data: null,
       error: {
         code: error.code,
-        message: error.message,
         details: error.details ?? null,
         request_id: RequestContext.requestId() ?? null,
       },
+      timestamp: new Date().toISOString(),
     };
     response.status(error.status).json(body);
   }

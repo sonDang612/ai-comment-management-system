@@ -1,6 +1,6 @@
 /**
  * HTTP contracts of the NestJS API (apps/api), shared with its TypeScript consumers.
- * The Python AI server uses the same envelope (apps/ai/src/acms_ai/server/errors.py).
+ * The Python AI server uses the same envelope (apps/ai/src/acms_ai/core/responses.py).
  */
 
 export const API_V1_PREFIX = '/api/v1';
@@ -20,23 +20,41 @@ export const ErrorCode = {
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
-/** Error envelope returned by every non-2xx API response. */
-export interface ApiErrorBody {
-  error: {
-    code: ErrorCode | (string & {});
-    message: string;
-    details?: unknown;
-    request_id?: string | null;
-  };
+export const SUCCESS_MESSAGE = 'Success';
+
+export interface ApiResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+  timestamp: string;
+}
+
+export interface ApiErrorInfo {
+  code: ErrorCode | (string & {});
+  details?: unknown;
+  request_id?: string | null;
+}
+
+export interface ApiErrorBody extends ApiResponse<null> {
+  error: ApiErrorInfo;
+}
+
+export function isApiResponse(value: unknown): value is ApiResponse<unknown> {
+  if (typeof value !== "object" || value === null || !("data" in value)) return false;
+  const body = value as { code?: unknown; message?: unknown; timestamp?: unknown };
+  return (
+    typeof body.code === "number" &&
+    typeof body.message === "string" &&
+    typeof body.timestamp === "string"
+  );
 }
 
 export function isApiErrorBody(value: unknown): value is ApiErrorBody {
-  if (typeof value !== "object" || value === null || !("error" in value)) return false;
+  if (!isApiResponse(value) || !("error" in value)) return false;
   const error = (value as { error: unknown }).error;
   return (
     typeof error === "object" &&
     error !== null &&
-    typeof (error as { code?: unknown }).code === "string" &&
-    typeof (error as { message?: unknown }).message === "string"
+    typeof (error as { code?: unknown }).code === "string"
   );
 }

@@ -23,6 +23,12 @@ export class BadRequestException extends AppException {
   }
 }
 
+export class ValidationException extends AppException {
+  constructor(message = 'Request validation failed', details?: unknown) {
+    super(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.VALIDATION_ERROR, message, details);
+  }
+}
+
 export class UnauthorizedException extends AppException {
   constructor(message = 'Authentication required', details?: unknown) {
     super(HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHORIZED, message, details);

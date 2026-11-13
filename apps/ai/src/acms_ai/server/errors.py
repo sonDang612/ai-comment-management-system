@@ -2,7 +2,8 @@
 
 Every non-2xx response uses the same envelope (mirrored in `packages/shared/src/api.ts`):
 
-    {"error": {"code": "not_found", "message": "...", "details": ..., "request_id": "..."}}
+    {"code": 404, "message": "...", "data": null,
+     "error": {"code": "not_found", "details": ..., "request_id": "..."}, "timestamp": "..."}
 
 Raise an `acms_ai.core.errors.AppError` subclass; never build error responses by hand.
 """
@@ -18,6 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from acms_ai.core.context import get_request_id
 from acms_ai.core.errors import AppError, ErrorCode
+from acms_ai.core.responses import ApiErrorInfo, ApiErrorResponse
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +42,12 @@ def error_response(
     details: Any = None,
     headers: dict[str, str] | None = None,
 ) -> JSONResponse:
-    body = {
-        "error": {
-            "code": code,
-            "message": message,
-            "details": details,
-            "request_id": get_request_id(),
-        }
-    }
+    body = ApiErrorResponse(
+        code=status_code,
+        message=message,
+        data=None,
+        error=ApiErrorInfo(code=code, details=details, request_id=get_request_id()),
+    )
     return JSONResponse(jsonable_encoder(body), status_code=status_code, headers=headers)
 
 

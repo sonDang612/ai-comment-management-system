@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "db:migrate": "pnpm --filter @acms/api db:migrate",
+    "db:reset": "pnpm --filter @acms/api db:reset",
     "env:init": "node scripts/env-init.mjs",
     "docker": "node scripts/docker.mjs",
     "docker:up": "node scripts/docker.mjs development up -d --build",

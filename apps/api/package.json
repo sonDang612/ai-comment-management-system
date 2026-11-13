@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:create": "prisma migrate dev --create-only",
     "db:migrate:dev": "prisma migrate dev",
+    "db:reset": "prisma migrate reset --force",
     "db:status": "prisma migrate status",
     "queue:smoke": "node scripts/queue-smoke.ts"
   },

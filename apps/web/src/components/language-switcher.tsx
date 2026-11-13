@@ -2,7 +2,6 @@
 
 import { Button, Dropdown, type MenuProps } from "antd";
 import { Languages } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LOCALE_LABELS, LOCALES, localizePath, useI18n } from "@/i18n";
 
@@ -14,14 +13,14 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   const items: MenuProps["items"] = LOCALES.map((target) => ({
     key: target,
     label: (
-      <Link
+      <a
         href={localizePath(pathname, target)}
         hrefLang={target}
         lang={target}
         aria-current={target === locale ? "true" : undefined}
       >
         {LOCALE_LABELS[target]}
-      </Link>
+      </a>
     ),
   }));
 

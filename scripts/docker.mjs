@@ -6,7 +6,8 @@
  *   npm run docker -- production up -d --build
  *
  * It sets APP_ENV (compose project `acms-<env>`, env_file paths, image tags) and passes
- * `infrastructure/docker/.env.<env>` and `apps/web/.env.<env>` to Compose for interpolation.
+ * `infrastructure/docker/.env.<env>` (ports), `apps/api/.env.<env>` (POSTGRES_* credentials)
+ * and `apps/web/.env.<env>` to Compose for interpolation.
  * It fails early, with the command to fix it, when a needed env file is missing.
  */
 import { spawnSync } from "node:child_process";
@@ -17,7 +18,7 @@ const ENVIRONMENTS = ["development", "staging", "production"];
 const ROOT = path.resolve(import.meta.dirname, "..");
 const COMPOSE_FILE = "infrastructure/docker/docker-compose.yml";
 
-/** Env file each service needs, besides the infra file (always required). */
+/** Env file each service needs, besides the infra and api files (always required). */
 const SERVICE_ENV_FILES = {
   migrate: "apps/api",
   api: "apps/api",
@@ -35,9 +36,12 @@ if (!ENVIRONMENTS.includes(env) || composeArgs.length === 0) {
 }
 
 const infraFile = `infrastructure/docker/.env.${env}`;
+// Holds POSTGRES_*, which every Compose command interpolates, so it is always required.
+const apiFile = `apps/api/.env.${env}`;
 const webFile = `apps/web/.env.${env}`;
 const missing = new Set();
 if (!existsSync(path.join(ROOT, infraFile))) missing.add("infrastructure/docker");
+if (!existsSync(path.join(ROOT, apiFile))) missing.add("apps/api");
 
 // Positional args after the subcommand are service names; none means every service.
 const command = composeArgs.find((arg) => !arg.startsWith("-"));
@@ -60,7 +64,7 @@ if (missing.size > 0) {
   process.exit(1);
 }
 
-const envFileArgs = ["--env-file", infraFile];
+const envFileArgs = ["--env-file", infraFile, "--env-file", apiFile];
 if (existsSync(path.join(ROOT, webFile))) envFileArgs.push("--env-file", webFile);
 
 const result = spawnSync("docker", ["compose", "-f", COMPOSE_FILE, ...envFileArgs, ...composeArgs], {

@@ -2,11 +2,11 @@
 # Run it through the wrapper, which picks the env files and the project name:
 #   npm run docker -- <env> <compose args>      e.g. npm run docker -- production up -d --build
 #   npm run docker:up / docker:down              (= development)
-#   npm run infra:up                             (development postgres + redis only, for host dev)
+#   npm run docker -- development up -d postgres redis   (postgres + redis only, for host dev)
 #
 # Configuration comes from env files, never from the repository root:
-#   infrastructure/docker/.env.<env>   postgres credentials + published host ports (this file's ${...})
-#   apps/api/.env.<env>                API container (env_file)
+#   infrastructure/docker/.env.<env>   published host ports (this file's ${...})
+#   apps/api/.env.<env>                api + migrate containers (env_file); POSTGRES_* for postgres (${...})
 #   apps/ai/.env.<env>                 ai-server + ai-worker containers (env_file)
 #   apps/web/.env.<env>                web: NEXT_PUBLIC_* build args (${...}) + container env
 # Only values that are fixed for every environment are written here.
@@ -43,9 +43,9 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?set in infrastructure/docker/.env.<env>}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in infrastructure/docker/.env.<env>}
-      POSTGRES_DB: ${POSTGRES_DB:?set in infrastructure/docker/.env.<env>}
+      POSTGRES_USER: ${POSTGRES_USER:?set in apps/api/.env.<env>}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in apps/api/.env.<env>}
+      POSTGRES_DB: ${POSTGRES_DB:?set in apps/api/.env.<env>}
       # Server logs and the default session zone (psql, `now()` display) in UTC+8.
       # `timestamptz` values are stored as UTC either way; Prisma always sends UTC.
       TZ: Asia/Shanghai

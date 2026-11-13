@@ -92,11 +92,11 @@ To stop the stack, run `npm run docker:down`. Data volumes are kept; remove them
 
 ```bash
 npm run env:init                                      # apps/api/.env, apps/ai/.env, apps/web/.env.local
-npm run env:init -- development                       # infrastructure/docker/.env.development (for infra:up)
+npm run env:init -- development                       # apps/api/.env.development (postgres credentials) + infrastructure/docker/.env.development (ports)
 npm install
 uv sync                                               # Python workspace -> .venv
 
-npm run infra:up                                      # development postgres + redis only
+npm run docker -- development up -d postgres redis   # development postgres + redis only
 npm run db:migrate                                    # prisma migrate deploy
 npm run dev                                           # web :3000, api :4000, ai-server :8000, ai-worker
 npm run queue:smoke --workspace @acms/api             # optional: API -> queue -> worker round trip
@@ -119,7 +119,6 @@ for both AI processes. One AI process alone: `npm run dev --workspace @acms/ai` 
 | `uv run pytest`                      | Every Python suite, from the repo root                       |
 | `npm run db:migrate`                 | Apply pending migrations                                     |
 | `npm run env:init [-- <env>]`        | Create missing env files from the templates                  |
-| `npm run infra:up` / `infra:down`    | Start/stop development postgres + redis                      |
 | `npm run docker:up` / `docker:down`  | Full development stack in Docker                             |
 | `npm run docker -- <env> <args>`     | Any Compose command for `development`/`staging`/`production` |
 
@@ -165,10 +164,10 @@ There is **no `.env` at the repository root**. Each project keeps its own files,
 | `apps/api/.env`                        | API on the host (`npm run dev`)           | `.env.example`           |
 | `apps/ai/.env`                         | AI server + worker on the host            | `.env.example`           |
 | `apps/web/.env.local`                  | Web on the host                           | `.env.example`           |
-| `apps/api/.env.<env>`                  | `api` + `migrate` containers              | `.env.docker.example`    |
+| `apps/api/.env.<env>`                  | `api` + `migrate`, Postgres credentials   | `.env.docker.example`    |
 | `apps/ai/.env.<env>`                   | `ai-server` + `ai-worker` containers      | `.env.docker.example`    |
 | `apps/web/.env.<env>`                  | `web` image build args (`NEXT_PUBLIC_*`)  | `.env.docker.example`    |
-| `infrastructure/docker/.env.<env>`     | Postgres credentials, published ports     | `.env.example`           |
+| `infrastructure/docker/.env.<env>`     | Published host ports                      | `.env.example`           |
 
 `<env>` is `development`, `staging` or `production`. `npm run docker -- <env> …` (`scripts/docker.mjs`) does three things:
 
@@ -183,7 +182,8 @@ git-ignored. Real environment variables always take precedence.
 Values that must agree across files:
 
 - `AI_SERVICE_TOKEN` (apps/api) = `INTERNAL_API_TOKEN` (apps/ai).
-- The credentials in `DATABASE_URL` (apps/api) = `POSTGRES_USER/PASSWORD/DB` (infrastructure/docker).
+- The credentials in `DATABASE_URL` = `POSTGRES_USER/PASSWORD/DB`, both in `apps/api/.env.<env>`. On the host,
+  `apps/api/.env` must use the same credentials as `apps/api/.env.development`.
 - `NEXT_PUBLIC_API_URL` (apps/web) is the API URL **as seen from the browser**. It is inlined at build time, so rebuild after changing it.
 - `APP_ENV=production` disables the AI server's `/docs`. `LOG_FORMAT=json` is meant for log shipping.
 

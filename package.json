@@ -16,9 +16,7 @@
     "env:init": "node scripts/env-init.mjs",
     "docker": "node scripts/docker.mjs",
     "docker:up": "node scripts/docker.mjs development up -d --build",
-    "docker:down": "node scripts/docker.mjs development down",
-    "infra:up": "node scripts/docker.mjs development up -d postgres redis",
-    "infra:down": "node scripts/docker.mjs development stop postgres redis"
+    "docker:down": "node scripts/docker.mjs development down"
   },
   "engines": {
     "node": ">=22.18"

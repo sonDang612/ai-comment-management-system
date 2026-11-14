@@ -21,7 +21,6 @@ const COMPOSE_FILE = "infrastructure/docker/docker-compose.yml";
 const SERVICE_ENV_FILES = {
   migrate: "apps/api",
   api: "apps/api",
-  "ai-server": "apps/ai",
   "ai-worker": "apps/ai",
   web: "apps/web",
 };

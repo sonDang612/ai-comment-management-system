@@ -1,7 +1,6 @@
-"""Domain errors, raisable from any layer (modules, server, worker).
+"""Domain errors, raisable from any layer (worker, training).
 
-The HTTP server turns them into the standard error envelope (`acms_ai.server.errors`).
-In the worker they fail the job like any other exception.
+In the worker they fail the job like any other exception; the training CLI reports them and exits 1.
 """
 
 from enum import StrEnum

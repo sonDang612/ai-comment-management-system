@@ -3,10 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import type { ComponentHealth, HealthResponse } from '@acms/shared';
 import type { Redis } from 'ioredis';
 import type { Env } from '../../config/env.js';
-import { AiServiceClient } from '../../infrastructure/ai-service/ai-service.client.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { AiJobsProducer } from '../../infrastructure/queue/ai-jobs.producer.js';
 import { REDIS_CLIENT } from '../../infrastructure/redis/redis.module.js';
+import { COMMENT_ANALYZER, type CommentAnalyzer } from '../moderation/analysis/comment-analyzer.js';
 
 /** A probe resolves (optionally with details) when healthy and throws otherwise. */
 export type Probe = () => Promise<Record<string, unknown> | void>;
@@ -21,7 +21,7 @@ export class HealthService {
     private readonly config: ConfigService<Env, true>,
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    private readonly aiService: AiServiceClient,
+    @Inject(COMMENT_ANALYZER) private readonly analyzer: CommentAnalyzer,
     private readonly aiJobs: AiJobsProducer,
   ) {}
 
@@ -34,13 +34,7 @@ export class HealthService {
       redis: async () => {
         await this.redis.ping();
       },
-      ai_service: async () => {
-        const res = await this.aiService.request<{ status: string }>('/health', {
-          timeoutMs: PROBE_TIMEOUT_MS,
-          acceptStatuses: [503],
-        });
-        if (res.status !== 'ok') throw new Error(`ai_service ${res.status}`);
-      },
+      ai_service: () => this.analyzer.health(PROBE_TIMEOUT_MS),
       worker: async () => {
         const workers = await this.aiJobs.workerCount();
         if (workers === 0) throw new Error('No workers connected to the AI jobs queue');

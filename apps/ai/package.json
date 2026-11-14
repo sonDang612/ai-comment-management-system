@@ -2,11 +2,9 @@
   "name": "@acms/ai",
   "version": "0.1.0",
   "private": true,
-  "description": "Turborepo task wrappers for the Python AI package (managed by uv). `dev` also starts `dev:worker` (see turbo.json).",
+  "description": "Turborepo task wrappers for the Python AI package (managed by uv).",
   "scripts": {
-    "dev": "uv run uvicorn acms_ai.server.main:app --reload --reload-dir src --host 0.0.0.0 --port 8000 --no-access-log",
-    "dev:worker": "uv run python -m acms_ai.worker",
-    "start:server": "uv run uvicorn acms_ai.server.main:app --host 0.0.0.0 --port 8000 --no-access-log",
+    "dev": "uv run python -m acms_ai.worker",
     "start:worker": "uv run python -m acms_ai.worker",
     "lint": "uv run ruff check src && uv run ruff format --check src",
     "format": "uv run ruff format src && uv run ruff check --fix src"

@@ -7,14 +7,18 @@
 # Configuration comes from env files, never from the repository root. Each one is created from the
 # app's .env.example (`pnpm env:init <env>`):
 #   apps/api/.env.<env>                api + migrate containers (env_file); POSTGRES_* for postgres (${...})
-#   apps/ai/.env.<env>                 ai-server + ai-worker containers (env_file)
+#   apps/ai/.env.<env>                 ai-worker container (env_file)
 #   apps/web/.env.<env>                web: NEXT_PUBLIC_* build args (${...}) + container env
 # Only values that are fixed for every environment are written here.
 # Host ports default to 5432/6379/4000/3000; override with POSTGRES_PORT, REDIS_PORT, API_PORT, WEB_PORT.
 #
-#   web (Next.js) --HTTP--> api (NestJS) --HTTP--> ai-server (apps/ai, FastAPI, internal)
+#   web (Next.js) --HTTP--> api (NestJS) --HTTP (OpenAI API)--> vllm (base model + LoRA adapter, GPU)
 #                            |  \--BullMQ (Redis)--> ai-worker (apps/ai, BullMQ consumer)
 #                            \--Prisma--> postgres
+#
+# vllm needs an NVIDIA GPU, so it only starts with its profile:
+#   pnpm docker <env> --profile vllm up -d
+# Without it, point VLLM_COMPOSE_URL at a vLLM server elsewhere, or use AI_ANALYZER=stub (local/test/development).
 
 # One isolated project per environment: separate containers, networks and data volumes.
 name: acms-${APP_ENV:?run through scripts/docker.mjs (pnpm docker <env> ...)}
@@ -29,13 +33,13 @@ x-common-env: &common-env
 x-api-network-env: &api-network-env
   DATABASE_URL: postgresql://${POSTGRES_USER:?set in apps/api/.env.<env>}:${POSTGRES_PASSWORD:?set in apps/api/.env.<env>}@postgres:5432/${POSTGRES_DB:?set in apps/api/.env.<env>}?schema=app
   REDIS_URL: redis://redis:6379/0
-  AI_SERVICE_URL: http://ai-server:8000
+  VLLM_URL: ${VLLM_COMPOSE_URL:-http://vllm:8000}
 
 x-api-build: &api-build
   context: ../..
   dockerfile: infrastructure/docker/api.Dockerfile
 
-# apps/ai: one Python package, one image build, two processes (targets share every layer).
+# apps/ai: the Python package; production runs only its BullMQ worker.
 x-ai-build: &ai-build
   context: ../..
   dockerfile: infrastructure/docker/python.Dockerfile
@@ -117,16 +121,44 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      ai-server:
-        condition: service_healthy
 
-  # Internal only: not published to the host. Only the API calls it.
-  ai-server:
-    <<: *ai-service
-    build:
-      <<: *ai-build
-      target: ai-server
-    image: acms-ai-server:${APP_ENV}
+  # Inference only: OpenAI-compatible API serving the frozen base model with the trained LoRA adapter.
+  # Internal: not published to the host. Only the API calls it. VLLM_* values come from apps/api/.env.<env>.
+  vllm:
+    profiles: [vllm]
+    image: vllm/vllm-openai:${VLLM_IMAGE_TAG:-v0.11.0}
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+      HF_HUB_OFFLINE: ${VLLM_HF_HUB_OFFLINE:-0}
+    command:
+      - --model=${VLLM_BASE_MODEL:-Qwen/Qwen3-1.7B}
+      - --enable-lora
+      - --lora-modules=${VLLM_MODEL:-acms-moderation}=/adapters/moderation
+      - --max-lora-rank=${VLLM_MAX_LORA_RANK:-16}
+      - --max-model-len=${VLLM_MAX_MODEL_LEN:-4096}
+      - --gpu-memory-utilization=${VLLM_GPU_MEMORY_UTILIZATION:-0.85}
+      - --max-logprobs=20
+      - --port=8000
+    volumes:
+      # Trained adapter folder (`<run>/adapter`), relative to this file. Read-only: vLLM never changes it.
+      - ${VLLM_ADAPTER_DIR:-../../apps/ai/training/outputs/qwen3-1.7b-lora-v1/adapter}:/adapters/moderation:ro
+      - vllm-cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 300s
+      retries: 5
 
   ai-worker:
     <<: *ai-service
@@ -160,3 +192,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  vllm-cache:

@@ -1,4 +1,4 @@
-"""Shared by both entrypoints: base settings, logging, request context, domain errors.
+"""Shared by every entrypoint: base settings, logging, request context, domain errors.
 
-Must not import from `acms_ai.server` or `acms_ai.worker`.
+Must not import from `acms_ai.worker` or `acms_ai.training`.
 """

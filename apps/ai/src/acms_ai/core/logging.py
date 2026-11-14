@@ -1,4 +1,4 @@
-"""Logging setup shared by the server and the worker (stdlib only)."""
+"""Logging setup shared by the worker and the training CLI (stdlib only)."""
 
 import json
 import logging
@@ -67,11 +67,5 @@ def configure_logging(level: str = "INFO", fmt: str = "text") -> None:
                 }
             },
             "root": {"level": level, "handlers": ["console"]},
-            "loggers": {
-                # Route uvicorn through our handler; access logs come from our middleware.
-                "uvicorn": {"handlers": [], "propagate": True},
-                "uvicorn.error": {"handlers": [], "propagate": True},
-                "uvicorn.access": {"handlers": [], "propagate": False},
-            },
         }
     )

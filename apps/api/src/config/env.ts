@@ -8,10 +8,13 @@
 const APP_ENVS = ['local', 'test', 'development', 'staging', 'production'] as const;
 const LOG_LEVELS = ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'] as const;
 const LOG_FORMATS = ['text', 'json'] as const;
+const AI_ANALYZERS = ['vllm', 'stub'] as const;
+const STUB_ANALYZER_ENVS: readonly AppEnv[] = ['local', 'test', 'development'];
 
 export type AppEnv = (typeof APP_ENVS)[number];
 export type LogLevel = (typeof LOG_LEVELS)[number];
 export type LogFormat = (typeof LOG_FORMATS)[number];
+export type AiAnalyzer = (typeof AI_ANALYZERS)[number];
 
 export interface Env {
   APP_ENV: AppEnv;
@@ -22,9 +25,12 @@ export interface Env {
   LOG_FORMAT: LogFormat;
   DATABASE_URL: string;
   REDIS_URL: string;
-  AI_SERVICE_URL: string;
-  AI_SERVICE_TOKEN: string;
-  AI_SERVICE_TIMEOUT_MS: number;
+  AI_ANALYZER: AiAnalyzer;
+  AI_CONFIDENCE_THRESHOLD: number;
+  VLLM_URL: string;
+  VLLM_MODEL: string;
+  VLLM_API_KEY: string;
+  VLLM_TIMEOUT_MS: number;
 }
 
 type Raw = Record<string, unknown>;
@@ -47,6 +53,16 @@ class EnvReader {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 0) {
       this.errors.push(`${key} must be a non-negative integer`);
+    }
+    return parsed;
+  }
+
+  number(key: string, fallback: number, min: number, max: number): number {
+    const value = this.raw[key];
+    if (value === undefined || value === '') return fallback;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      this.errors.push(`${key} must be a number between ${min} and ${max}`);
     }
     return parsed;
   }
@@ -89,10 +105,16 @@ export function validateEnv(raw: Raw): Env {
     LOG_FORMAT: env.oneOf('LOG_FORMAT', LOG_FORMATS, 'text'),
     DATABASE_URL: env.url('DATABASE_URL', ['postgresql:', 'postgres:']),
     REDIS_URL: env.url('REDIS_URL', ['redis:', 'rediss:'], 'redis://localhost:6379/0'),
-    AI_SERVICE_URL: env.url('AI_SERVICE_URL', ['http:', 'https:'], 'http://localhost:8000'),
-    AI_SERVICE_TOKEN: env.string('AI_SERVICE_TOKEN'),
-    AI_SERVICE_TIMEOUT_MS: env.int('AI_SERVICE_TIMEOUT_MS', 10_000),
+    AI_ANALYZER: env.oneOf('AI_ANALYZER', AI_ANALYZERS, 'vllm'),
+    AI_CONFIDENCE_THRESHOLD: env.number('AI_CONFIDENCE_THRESHOLD', 0.85, 0, 1),
+    VLLM_URL: env.url('VLLM_URL', ['http:', 'https:'], 'http://localhost:8000'),
+    VLLM_MODEL: env.string('VLLM_MODEL', 'acms-moderation'),
+    VLLM_API_KEY: env.string('VLLM_API_KEY', ''),
+    VLLM_TIMEOUT_MS: env.int('VLLM_TIMEOUT_MS', 30_000),
   };
+  if (result.AI_ANALYZER === 'stub' && !STUB_ANALYZER_ENVS.includes(result.APP_ENV)) {
+    env.errors.push(`AI_ANALYZER=stub is only allowed when APP_ENV is ${STUB_ANALYZER_ENVS.join(', ')}`);
+  }
   if (env.errors.length > 0) {
     throw new Error(`Invalid environment configuration:\n  - ${env.errors.join('\n  - ')}`);
   }

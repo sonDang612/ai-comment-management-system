@@ -37,9 +37,13 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 
 - The NestJS API (`apps/api`) is the only public backend and the only owner of the database schema (Prisma).
   Python (`apps/ai`) never writes business tables: results go back to the API.
+- Online inference: the API calls vLLM directly (`src/infrastructure/vllm`, OpenAI-compatible API). vLLM serves
+  the frozen base model with the trained LoRA adapter and only runs inference; the API builds the prompt
+  (`modules/moderation/analysis`, mirrors `acms_ai.training.prompt`), validates the answer and decides the result.
+  There is no FastAPI server. `AI_ANALYZER=stub` exists only for local/test/development.
 - `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
-  It only does AI work (normalization, rule filter, model inference). Any data it needs comes from the API
-  over HTTP or in the job payload.
+  It runs the queue worker and the offline LoRA training (`acms_ai.training`). Any data it needs comes from the
+  job payload or exported JSONL files.
 - This system only checks comments: it stores and returns `content`, `is_valid`, `is_question`, `confidence` and
   `reason`. It has no comment status (`approved` / `pending` / `disabled`) and no decision source; the integrating
   system decides what to do with the result.
@@ -48,16 +52,16 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
   When the rule check or the AI fails, the result fields stay `null` (unchecked).
 - API: controllers stay thin, logic lives in services, infrastructure clients live in `src/infrastructure`.
   Throw `AppException` subclasses, never raw errors.
-- AI: shared code in `core/` and `modules/`. `core` never imports `server` or `worker`, and `server` and `worker`
-  never import each other. Raise `AppError` subclasses. Everything under `/v1` requires `X-Internal-Token`.
+- AI: shared code in `core/`. `core` never imports `worker` or `training`, and they never import each other.
+  Raise `AppError` subclasses.
 - Web: server state in TanStack Query, client UI state in Zustand, one folder per feature in `src/features/<name>`,
   pages under `src/app/[lang]/`.
 - Shared TS contracts (error envelope, queue and job names) live in `packages/shared`. Reuse them instead of redefining them.
-- Every HTTP response from the API and from the AI server uses the envelope
+- Every HTTP response from the API uses the envelope
   `{ "code", "message", "data", "timestamp" }`: `code` is the HTTP status, `message` is `"Success"` on 2xx,
   `timestamp` is ISO 8601 UTC. Errors set `data: null` and add `"error": { "code", "details", "request_id" }`
   with the machine-readable error code. NestJS wraps responses in `ResponseEnvelopeInterceptor` (services and
-  controllers return plain data); Python routers return `success(...)` from `acms_ai.core.responses`.
+  controllers return plain data).
 - Public endpoints are versioned under `/api/v1`. Breaking changes go into a new version only.
 
 ## Moderation business rules (from the docs)

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Python AI package (apps/ai). Build context: repository root.
-# One build, two targets that differ only in command and healthcheck (all layers are shared):
-#   docker build -f infrastructure/docker/python.Dockerfile --target ai-server .
+# Production runs only the BullMQ worker. Online inference is served by vLLM (see docker-compose.yml),
+# and LoRA training runs offline on a GPU machine, not in this image.
 #   docker build -f infrastructure/docker/python.Dockerfile --target ai-worker .
 
 ARG PYTHON_VERSION=3.12
@@ -37,13 +37,6 @@ RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 USER app
-
-# ---------- HTTP server (internal, called only by the NestJS API) ----------
-FROM runtime AS ai-server
-EXPOSE 8000
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
-    CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2).status == 200 else 1)"]
-CMD ["uvicorn", "acms_ai.server.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--proxy-headers"]
 
 # ---------- Worker (BullMQ consumer) ----------
 FROM runtime AS ai-worker

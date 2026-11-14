@@ -7,7 +7,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from acms_ai.modules.analysis.schemas import MAX_CONTENT_LENGTH
 from acms_ai.training.errors import TrainingDataError
 from acms_ai.training.labels import ModerationLabel, label_from_flags
 
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 CJK_FULL_STOPS = str.maketrans({"。": ".", "｡": "."})
 FORMAT_CHAR_CATEGORY = "Cf"
 MAX_REPORTED_ERRORS = 20
+MAX_CONTENT_LENGTH = 10_000
 
 
 def content_key(content: str) -> str:

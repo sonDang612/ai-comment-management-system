@@ -4,9 +4,10 @@ Monorepo for the AI Comment Moderation service (requirements: [`docs/requirement
 This is the **foundation only**: infrastructure, conventions and health checks. No business features yet.
 
 ```
-web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP + X-Internal-Token──▶ ai-server (FastAPI, internal) ┐ apps/ai:
-                         │   │                                                                    │ one Python package,
-                         │   └──BullMQ (Redis)──▶ ai-worker (BullMQ consumer) ────────────────────┘ two entrypoints
+                                        online                                      offline (GPU machine)
+web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP (OpenAI API)──▶ vllm ◀── LoRA adapter ── apps/ai: acms_ai.training
+                         │   │   rules + final result      base model + adapter     (JSONL → split → train → evaluate)
+                         │   └──BullMQ (Redis)──▶ ai-worker (apps/ai, BullMQ consumer)
                          │                           └── results via BullMQ events ──▶ api
                          └──Prisma──▶ PostgreSQL
 ```
@@ -15,17 +16,18 @@ web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP + X-Internal-Token─�
 | -------------- | ---------------------------------------------------------------------------------------- |
 | Frontend       | Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, Zustand, TanStack Query |
 | Main API       | NestJS 12 (ESM), Prisma 7 (`@prisma/adapter-pg`), BullMQ producer                        |
-| AI server      | `apps/ai` → `acms_ai.server`: Python 3.12, FastAPI, Pydantic v2. Internal, called by the API |
+| AI inference   | vLLM (OpenAI-compatible API): frozen base model + trained LoRA adapter. Called by the API only |
 | AI worker      | `apps/ai` → `acms_ai.worker`: BullMQ (Python) consumer of the `ai-jobs` queue            |
+| AI training    | `apps/ai` → `acms_ai.training`: PyTorch, Transformers, PEFT (LoRA), TRL. Offline only    |
 | Database       | PostgreSQL 17 (tables in the `app` schema), migrations by Prisma Migrate                 |
 | Cache / Queue  | Redis 7                                                                                  |
 | Monorepo       | Turborepo + pnpm workspace (JS), uv workspace (Python)                                  |
 | Infrastructure | Docker Compose                                                                           |
 
 **Who owns what.** The NestJS API is the only public backend and the only owner of the database schema.
-`apps/ai` is one Python package with two entrypoints that share the same `core/` and `modules/` code: the server
-does stateless inference over HTTP for synchronous calls, and the worker runs long or batch AI work from the queue.
-Python never writes business tables directly: results go back to the API.
+The API runs the rule checks, calls vLLM directly for inference, validates the answer and decides what is stored.
+vLLM only runs the model. `apps/ai` is one Python package: the worker runs queue jobs, and the training CLI builds
+LoRA adapters offline. Python never writes business tables directly: results go back to the API.
 
 ## Repository layout
 
@@ -41,15 +43,13 @@ Python never writes business tables directly: results go back to the API.
 │   │   └── src/
 │   │       ├── common/           # request context, AppException, global filter, logger
 │   │       ├── config/env.ts     # validated env schema
-│   │       ├── infrastructure/   # prisma, redis, queue (BullMQ), ai-service (HTTP client)
+│   │       ├── infrastructure/   # prisma, redis, queue (BullMQ), vllm (HTTP client)
 │   │       ├── modules/<x>/      # feature modules (controller / service)
 │   │       └── generated/prisma/ # generated client (git-ignored)
-│   └── ai/                       # Python: one package (acms_ai), two entrypoints
+│   └── ai/                       # Python: one package (acms_ai): worker + offline training
 │       ├── src/acms_ai/
 │       │   ├── core/             # shared: settings base, logging, request context, AppError
-│       │   ├── modules/<x>/      # shared feature logic (service.py), plus router.py/schemas.py
-│       │   ├── server/           # entrypoint 1: FastAPI app, middleware, auth, error envelope
-│       │   ├── worker/           # entrypoint 2: BullMQ consumer, processor, jobs/, healthcheck
+│       │   ├── worker/           # BullMQ consumer, processor, jobs/, healthcheck
 │       │   └── training/         # offline: LoRA fine-tuning CLI (python -m acms_ai.training)
 │       ├── training/             # LoRA configs + docs; data/, models/, outputs/ are git-ignored
 ├── packages/
@@ -60,8 +60,7 @@ Python never writes business tables directly: results go back to the API.
 └── pyproject.toml / uv.lock      # uv workspace (apps/ai)
 ```
 
-`apps/ai` also has a small `package.json` so Turborepo can run its `dev` / `lint` tasks (they call `uv`).
-Its `turbo.json` makes `dev` start the server and the worker together (`dev` + `dev:worker`).
+`apps/ai` also has a small `package.json` so Turborepo can run its `dev` (worker) / `lint` tasks (they call `uv`).
 
 ## Prerequisites
 
@@ -85,7 +84,8 @@ Other environments use the same wrapper with their own files, e.g.
 | API      | http://localhost:4000/api/v1          |
 | Health   | http://localhost:4000/api/v1/health   |
 
-The AI server is not published to the host. Only the API calls it, inside the Compose network.
+The `vllm` service needs an NVIDIA GPU and starts only with `--profile vllm` (see [AI inference](#ai-inference-vllm)).
+It is not published to the host: only the API calls it, inside the Compose network.
 The `migrate` service runs `prisma migrate deploy` once, and `api` starts only after it succeeds.
 To stop the stack, run `pnpm docker:down`. Data volumes are kept; remove them only on purpose with `pnpm docker <env> down -v`.
 
@@ -99,14 +99,13 @@ uv sync                                               # Python workspace -> .ven
 
 pnpm docker development up -d postgres redis   # development postgres + redis only
 pnpm db:migrate                                    # prisma migrate deploy
-pnpm dev                                           # web :3000, api :4000, ai-server :8000, ai-worker
+pnpm dev                                           # web :3000, api :4000, ai-worker
 pnpm --filter @acms/api queue:smoke             # optional: API -> queue -> worker round trip
 ```
 
-`AI_SERVICE_TOKEN` (api) and `INTERNAL_API_TOKEN` (apps/ai) must have the same value.
-You can also run one app on its own, e.g. `pnpm turbo run dev --filter @acms/api`, or `--filter @acms/ai`
-for both AI processes. One AI process alone: `pnpm --filter @acms/ai dev` (server) or
-`pnpm --filter @acms/ai dev:worker`.
+Without a vLLM server, set `AI_ANALYZER=stub` in `apps/api/.env`, or point `VLLM_URL` at a running vLLM.
+You can also run one app on its own, e.g. `pnpm turbo run dev --filter @acms/api`, or
+`pnpm --filter @acms/ai dev` for the AI worker.
 
 ## Common commands
 
@@ -154,11 +153,49 @@ pnpm db:status
 - Results return to the API through BullMQ events (`AiJobsEvents`).
 - Redis runs with `maxmemory-policy noeviction`, as BullMQ requires.
 
+## AI inference (vLLM)
+
+`ModerationService` runs the rule checks first. Only when every rule passes does it ask the configured analyzer
+(`AI_ANALYZER`):
+
+- `vllm` (default): `VllmCommentAnalyzer` sends the comment to vLLM's `/v1/chat/completions` with the same prompt
+  as training (`modules/moderation/analysis/moderation-prompt.ts`, mirrors `acms_ai.training.prompt`), JSON schema
+  output, temperature 0 and token logprobs. The answer is validated (`label` in `valid` / `question` / `invalid`,
+  `reason` a string), and the confidence is the probability of the chosen label among the three labels.
+- `stub`: marks every comment that passes the rules as valid. Allowed only when `APP_ENV` is `local`, `test` or
+  `development`; the API refuses to start otherwise.
+
+Fail-safe: a timeout (`VLLM_TIMEOUT_MS`), a transport or HTTP error, an invalid answer or a missing confidence
+leaves the comment **unchecked** (result fields `null`). A non-question answer below `AI_CONFIDENCE_THRESHOLD` is
+also left unchecked. Nothing is ever marked valid because inference failed.
+
+| Variable (apps/api)       | Default            | Meaning                                                          |
+| ------------------------- | ------------------ | ---------------------------------------------------------------- |
+| `AI_ANALYZER`             | `vllm`             | `vllm` or `stub` (stub: local/test/development only)             |
+| `AI_CONFIDENCE_THRESHOLD` | `0.85`             | Minimum confidence to store a non-question AI result             |
+| `VLLM_URL`                | `http://localhost:8000` | vLLM server root (Compose: `VLLM_COMPOSE_URL`, default `http://vllm:8000`) |
+| `VLLM_MODEL`              | `acms-moderation`  | Served LoRA adapter name (`--lora-modules <name>=<dir>`)         |
+| `VLLM_API_KEY`            | empty              | Bearer token, if vLLM was started with an API key                |
+| `VLLM_TIMEOUT_MS`         | `30000`            | Inference timeout                                                |
+
+Run vLLM with the base model and the adapter of a training run (the base model is never modified):
+
+```bash
+# Docker (GPU host): uses VLLM_BASE_MODEL, VLLM_ADAPTER_DIR, VLLM_MODEL ... from apps/api/.env.<env>
+pnpm docker production --profile vllm up -d
+
+# Or directly:
+vllm serve Qwen/Qwen3-1.7B --enable-lora --max-lora-rank 16 --max-logprobs 20 \
+  --lora-modules acms-moderation=apps/ai/training/outputs/qwen3-1.7b-lora-v1/adapter
+```
+
+`GET /api/v1/health` reports `ai_service` as healthy when vLLM lists `VLLM_MODEL` (or always, with the stub).
+
 ## LoRA fine-tuning (offline)
 
 `acms_ai.training` trains a LoRA adapter for Qwen3-1.7B on labeled JSONL exports, tunes thresholds on the
 validation split and evaluates once on a held-out test split. The base model stays frozen and unmodified.
-It runs on a GPU machine, not in the server or worker containers. See [`apps/ai/training/README.md`](apps/ai/training/README.md).
+It runs on a GPU machine, not in the production containers; its adapter is then served by vLLM. See [`apps/ai/training/README.md`](apps/ai/training/README.md).
 
 ## Environment variables
 
@@ -169,14 +206,14 @@ Each app has **one template, `.env.example`**, for all of its env files:
 | File                                   | Used by                                   |
 | -------------------------------------- | ----------------------------------------- |
 | `apps/api/.env`                        | API on the host (`pnpm dev`)           |
-| `apps/ai/.env`                         | AI server + worker on the host            |
+| `apps/ai/.env`                         | AI worker on the host                     |
 | `apps/web/.env.local`                  | Web on the host                           |
 | `apps/api/.env.<env>`                  | `api` + `migrate`, Postgres credentials   |
-| `apps/ai/.env.<env>`                   | `ai-server` + `ai-worker` containers      |
+| `apps/ai/.env.<env>`                   | `ai-worker` container                     |
 | `apps/web/.env.<env>`                  | `web` image build args (`NEXT_PUBLIC_*`)  |
 
 The templates use host values (`localhost`). Inside Docker, Compose overrides the in-network addresses:
-`DATABASE_URL` (built from `POSTGRES_*`), `REDIS_URL` and `AI_SERVICE_URL`, plus `APP_ENV`, `NODE_ENV`, `PORT` and `TZ`.
+`DATABASE_URL` (built from `POSTGRES_*`), `REDIS_URL` and `VLLM_URL`, plus `APP_ENV`, `NODE_ENV`, `PORT` and `TZ`.
 
 `<env>` is `development`, `staging` or `production`. `pnpm docker <env> …` (`scripts/docker.mjs`) does three things:
 
@@ -190,24 +227,23 @@ git-ignored. Real environment variables always take precedence.
 
 Values that must agree across files:
 
-- `AI_SERVICE_TOKEN` (apps/api) = `INTERNAL_API_TOKEN` (apps/ai).
+- `VLLM_API_KEY` (apps/api) = the API key vLLM runs with, and `VLLM_MODEL` = its `--lora-modules` name.
 - `POSTGRES_USER/PASSWORD/DB` in `apps/api/.env.<env>` create the database, and Compose builds the in-network
   `DATABASE_URL` from them (keep the password URL-safe). On the host, `DATABASE_URL` in `apps/api/.env` must use
   the same credentials as `apps/api/.env.development`.
 - `NEXT_PUBLIC_API_URL` (apps/web) is the API URL **as seen from the browser**. It is inlined at build time, so rebuild after changing it.
-- `APP_ENV=production` disables the AI server's `/docs`. `LOG_FORMAT=json` is meant for log shipping.
+- `LOG_FORMAT=json` is meant for log shipping.
 
 ## Cross-cutting conventions
 
-**Response envelope.** Every response, from the API and from the AI server, uses the same envelope.
+**Response envelope.** Every API response uses the same envelope.
 `code` is the HTTP status and `timestamp` is ISO 8601 UTC:
 
 ```json
 { "code": 200, "message": "Success", "data": { }, "timestamp": "2026-11-13T13:00:00.000Z" }
 ```
 
-Clients read `data`. In the API, `ResponseEnvelopeInterceptor` wraps what controllers return. In the AI server,
-routers return `success(...)` from `acms_ai.core.responses`.
+Clients read `data`. In the API, `ResponseEnvelopeInterceptor` wraps what controllers return.
 
 **Errors.** Errors use the same envelope with `data: null`, plus the machine-readable error code:
 
@@ -218,13 +254,13 @@ routers return `success(...)` from `acms_ai.core.responses`.
 - API: throw an `AppException` subclass (`NotFoundException`, `ConflictException`, …) from
   `src/common/errors/app.exception.ts`. Nest `HttpException`s and Prisma `P2002`/`P2025` are mapped too.
   Unexpected errors are logged with a stack trace and returned as a generic `internal_error`.
-- AI (server and worker): raise an `AppError` subclass from `acms_ai.core.errors`. Its failures reach the browser
-  only as the API's `service_unavailable`.
+- AI (worker and training): raise an `AppError` subclass from `acms_ai.core.errors`.
+- vLLM failures never reach the browser: the comment stays unchecked and the API logs a warning.
 - Web: `apiClient` throws `ApiError` (`status`, `code`, `details`, `requestId`).
 - The shared types live in `packages/shared/src/api.ts`.
 
 **Request ids.** Clients may send `X-Request-ID`. Otherwise one is generated. It is echoed in the response,
-added to every log line, forwarded to the AI server and attached to queued jobs.
+added to every log line, forwarded to vLLM and attached to queued jobs.
 
 **Health checks.**
 
@@ -232,7 +268,7 @@ added to every log line, forwarded to the AI server and attached to queued jobs.
 | -------------------------------- | -------------------------------------------------------------- |
 | `GET :4000/api/v1/health`        | Readiness: database, redis, ai_service, worker. 503 if degraded |
 | `GET :4000/api/v1/health/live`   | API liveness (Docker healthcheck)                              |
-| `GET ai-server:8000/health`      | AI server readiness (`/health/live` for liveness)              |
+| `GET vllm:8000/health`           | vLLM liveness (Compose healthcheck)                            |
 | `python -m acms_ai.worker.healthcheck` | AI worker liveness (heartbeat file)                      |
 | `GET :3000/api/health`           | Web liveness                                                   |
 
@@ -260,8 +296,7 @@ locale-prefixed URLs: `/zh-CN/...`, `/en/...`.
 
 **Module boundaries.**
 - API: controllers stay thin and business logic lives in services. Infrastructure clients are global providers in `src/infrastructure`.
-- AI: shared code lives in `core/` and `modules/`; `core` never imports `server` or `worker`, and
-  `server` and `worker` never import each other. Server: `/health*` is public. Everything under `/v1` requires `X-Internal-Token`.
+- AI: shared code lives in `core/`; `core` never imports `worker` or `training`, and they never import each other.
 - Web: server state lives in TanStack Query and client UI state in Zustand. Each feature goes in `features/<name>`.
 
 ## Troubleshooting
@@ -271,5 +306,6 @@ locale-prefixed URLs: `/zh-CN/...`, `/en/...`.
 - **Web shows "API unreachable"**: check `NEXT_PUBLIC_API_URL`, and that the web origin is listed in `CORS_ORIGINS`.
   For the Docker image, rebuild after changing it (it is a build arg).
 - **Health shows `worker: No workers connected`**: start the AI worker, and check that it uses the same `REDIS_URL` (and db) as the API.
-- **Health shows `ai_service` error**: check that the AI server is running, that `AI_SERVICE_URL` is correct, and that the tokens match.
+- **Health shows `ai_service` error**: check that vLLM is running, that `VLLM_URL` is correct, that it serves `VLLM_MODEL`, and that `VLLM_API_KEY` matches.
+- **Comments stay unchecked**: look for `Analysis failed` or `below` in the API log (vLLM error, timeout, invalid answer, or confidence below `AI_CONFIDENCE_THRESHOLD`).
 - **`Invalid environment configuration`** on API start: the message lists every invalid variable. Compare with `apps/api/.env.example`.

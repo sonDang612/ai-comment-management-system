@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { AiCommentAnalysis } from '@acms/shared';
-import { AiAnalysisClient } from '../../infrastructure/ai-service/ai-analysis.client.js';
+import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import type { Comment } from '../../generated/prisma/client.js';
 import { RuleSettingsService } from '../rule-settings/rule-settings.service.js';
+import { COMMENT_ANALYZER, type CommentAnalyzer } from './analysis/comment-analyzer.js';
 import { RuleChecker, type RuleViolation } from './rules/rule-checker.js';
 
 const RULE_MATCH_CONFIDENCE = 1;
@@ -25,13 +27,17 @@ function ruleViolationResult(violations: RuleViolation[]): AiCommentAnalysis {
 @Injectable()
 export class ModerationService {
   private readonly logger = new Logger(ModerationService.name);
+  private readonly confidenceThreshold: number;
 
   constructor(
+    config: ConfigService<Env, true>,
     private readonly prisma: PrismaService,
-    private readonly aiAnalysis: AiAnalysisClient,
+    @Inject(COMMENT_ANALYZER) private readonly analyzer: CommentAnalyzer,
     private readonly ruleChecker: RuleChecker,
     private readonly ruleSettings: RuleSettingsService,
-  ) {}
+  ) {
+    this.confidenceThreshold = config.get('AI_CONFIDENCE_THRESHOLD', { infer: true });
+  }
 
   async moderate(comment: Comment): Promise<Comment> {
     let violations: RuleViolation[];
@@ -45,12 +51,22 @@ export class ModerationService {
     if (violations.length > 0) return this.saveResult(comment, ruleViolationResult(violations));
 
     try {
-      const analysis = await this.aiAnalysis.analyzeComment({ comment_id: comment.id, content: comment.content });
+      const analysis = await this.analyzer.analyze({ comment_id: comment.id, content: comment.content });
+      if (!this.isConfident(analysis)) {
+        this.logger.log(
+          `AI confidence ${analysis.confidence.toFixed(2)} is below ${this.confidenceThreshold} for comment ${comment.id}, it stays unchecked`,
+        );
+        return comment;
+      }
       return this.saveResult(comment, analysis);
     } catch (error) {
       this.logger.warn(`Analysis failed for comment ${comment.id}, it stays unchecked: ${errorMessage(error)}`);
       return comment;
     }
+  }
+
+  private isConfident(analysis: AiCommentAnalysis): boolean {
+    return analysis.is_question || analysis.confidence >= this.confidenceThreshold;
   }
 
   private saveResult(comment: Comment, result: AiCommentAnalysis): Promise<Comment> {

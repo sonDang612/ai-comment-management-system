@@ -1,6 +1,6 @@
-"""Settings shared by both entrypoints. Each entrypoint extends `CommonSettings`.
+"""Settings shared by the entrypoints. Each entrypoint extends `CommonSettings`.
 
-Values come from environment variables, then `apps/ai/.env` (one file for both processes).
+Values come from environment variables, then `apps/ai/.env`.
 """
 
 from typing import Literal

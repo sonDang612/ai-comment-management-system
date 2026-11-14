@@ -1,14 +1,12 @@
 [project]
 name = "acms-ai"
 version = "0.1.0"
-description = "AI Comment Moderation - AI package: internal HTTP server (FastAPI) + queue worker (BullMQ)"
+description = "AI Comment Moderation - AI package: queue worker (BullMQ) + offline LoRA training"
 requires-python = ">=3.12"
 dependencies = [
   "bullmq>=3.6",
-  "fastapi>=0.115",
   "pydantic>=2.10",
   "pydantic-settings>=2.7",
-  "uvicorn[standard]>=0.32",
 ]
 
 [build-system]

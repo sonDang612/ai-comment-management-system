@@ -3,8 +3,10 @@
 Offline pipeline that trains a **LoRA adapter** on top of a frozen Qwen3-1.7B, tunes the decision thresholds on the
 validation split, and measures the result once on an untouched test split.
 
-It is a third entrypoint of `apps/ai` (`python -m acms_ai.training`), next to `server` and `worker`. It imports
+It is an offline entrypoint of `apps/ai` (`python -m acms_ai.training`), next to the queue worker. It imports
 only `acms_ai.core` and never touches PostgreSQL, Redis or the API. Training data comes from exported JSONL files.
+In production the adapter is served by vLLM, and the NestJS API calls vLLM directly (see the root README,
+"AI inference (vLLM)").
 
 ```
 labeled *.jsonl ──split──▶ train / validation / test (+ manifest.json with SHA-256 per file)
@@ -31,7 +33,7 @@ Run every command **from `apps/ai`**: relative paths in the config resolve from 
 ## Requirements
 
 - Python packages: `torch` (CUDA build), `transformers`, `peft`, `trl`, `datasets`, `accelerate`,
-  plus `bitsandbytes` for `load_in_4bit`. They are not dependencies of the server or the worker.
+  plus `bitsandbytes` for `load_in_4bit`. They are not dependencies of the worker or of any production image.
 - An NVIDIA GPU with CUDA for real training. CPU works only for tiny dry runs.
 
 | GPU memory | Suggested settings for Qwen3-1.7B                                                         |
@@ -203,6 +205,16 @@ training/outputs/qwen3-1.7b-lora-v1/
 `tune-thresholds` and `evaluate` read the model, LoRA and sequence settings from `training_config.json`, so
 inference always matches training. A run trained with another prompt version is refused.
 
-To use the adapter elsewhere, load the same base model and apply the adapter, for example with PEFT
-(`PeftModel.from_pretrained(base, "…/adapter")`) or vLLM's LoRA support. The adapter is a few dozen MB. The base
-model stays as published.
+## Serving the adapter (vLLM)
+
+Serve the same base model with the adapter, under the name the API sends as `VLLM_MODEL`:
+
+```bash
+vllm serve Qwen/Qwen3-1.7B --enable-lora --max-lora-rank 16 --max-logprobs 20 \
+  --lora-modules acms-moderation=training/outputs/qwen3-1.7b-lora-v1/adapter
+```
+
+`--max-lora-rank` must be at least the trained `lora.rank`. The API uses the same prompt as training
+(`apps/api/src/modules/moderation/analysis/moderation-prompt.ts` mirrors `acms_ai.training.prompt`): when you
+change the prompt here, bump `PROMPT_VERSION` and update the API copy too. The adapter is a few dozen MB, and
+the base model stays as published.

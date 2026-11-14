@@ -6,10 +6,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor.js';
 import { AppValidationPipe } from './common/pipes/app-validation.pipe.js';
 import { validateEnv } from './config/env.js';
-import { AiServiceModule } from './infrastructure/ai-service/ai-service.module.js';
 import { PrismaModule } from './infrastructure/prisma/prisma.module.js';
 import { QueueModule } from './infrastructure/queue/queue.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
+import { VllmModule } from './infrastructure/vllm/vllm.module.js';
 import { CommentsModule } from './modules/comments/comments.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { RuleSettingsModule } from './modules/rule-settings/rule-settings.module.js';
@@ -22,7 +22,7 @@ import { RuleSettingsModule } from './modules/rule-settings/rule-settings.module
     PrismaModule,
     RedisModule,
     QueueModule,
-    AiServiceModule,
+    VllmModule,
     // Feature modules
     HealthModule,
     CommentsModule,

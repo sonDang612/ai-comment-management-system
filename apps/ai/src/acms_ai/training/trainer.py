@@ -102,7 +102,7 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
         gradient_accumulation_steps=settings.gradient_accumulation_steps,
         learning_rate=settings.learning_rate,
         num_train_epochs=settings.epochs,
-        warmup_ratio=settings.warmup_ratio,
+        warmup_steps=settings.warmup_ratio,
         weight_decay=settings.weight_decay,
         lr_scheduler_type=settings.lr_scheduler,
         max_grad_norm=settings.max_grad_norm,

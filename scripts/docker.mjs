@@ -39,10 +39,15 @@ const webFile = `apps/web/.env.${env}`;
 const missing = new Set();
 if (!existsSync(path.join(ROOT, apiFile))) missing.add("apps/api");
 
+// Global Compose options whose value is a separate argument (`--profile vllm`), so it is not the subcommand.
+const OPTIONS_WITH_VALUE = new Set(["--profile", "-f", "--file", "--env-file", "-p", "--project-name", "--project-directory", "--ansi", "--progress", "--parallel"]);
+const commandIndex = composeArgs.findIndex(
+  (arg, index) => !arg.startsWith("-") && !OPTIONS_WITH_VALUE.has(composeArgs[index - 1]),
+);
+const command = composeArgs[commandIndex];
 // Positional args after the subcommand are service names; none means every service.
-const command = composeArgs.find((arg) => !arg.startsWith("-"));
 if (STARTING_COMMANDS.has(command)) {
-  const named = composeArgs.slice(composeArgs.indexOf(command) + 1).filter((a) => !a.startsWith("-"));
+  const named = composeArgs.slice(commandIndex + 1).filter((a) => !a.startsWith("-"));
   const services = named.length > 0 ? named : Object.keys(SERVICE_ENV_FILES);
   for (const service of services) {
     const dir = SERVICE_ENV_FILES[service];

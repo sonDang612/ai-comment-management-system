@@ -102,10 +102,8 @@ const zhCN = {
       maxLength: "最长评论长度",
       maxRepeatedChars: "连续重复字符上限",
       maxRepeatedCharsHint: "同一字符连续出现超过该次数时视为违规。",
-      allowEmpty: "允许空评论",
-      allowEmptyHint: "关闭后，空白评论将被拦截。",
-      allowEmojiOnly: "允许纯表情评论",
-      allowEmojiOnlyHint: "关闭后，只包含表情符号的评论将被拦截。",
+      maxRepeatedWords: "连续重复词语上限",
+      maxRepeatedWordsHint: "同一词语连续出现超过该次数时视为违规（不区分大小写）。",
     },
     keywords: {
       title: "限制关键词",
@@ -118,6 +116,8 @@ const zhCN = {
     links: {
       title: "链接与域名",
       description: "评论中的链接只放行白名单中的域名（含子域名），其他链接一律拦截。",
+      allowIpAddresses: "允许评论包含 IP 地址",
+      allowIpAddressesHint: "关闭后，包含 IPv4 或 IPv6 地址的评论将被判定为无效。",
       whitelist: "域名白名单",
       whitelistHint: "只有这些域名的链接会被放行。",
       domainPlaceholder: "例如 example.com",

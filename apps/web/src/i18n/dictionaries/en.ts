@@ -100,11 +100,9 @@ const en: Dictionary = {
       maxRepeatedChars: "Maximum consecutive repeated characters",
       maxRepeatedCharsHint:
         "A character repeated in a row more than this many times is a violation.",
-      allowEmpty: "Allow empty comments",
-      allowEmptyHint: "When off, blank comments are blocked.",
-      allowEmojiOnly: "Allow emoji-only comments",
-      allowEmojiOnlyHint:
-        "When off, comments that contain only emoji are blocked.",
+      maxRepeatedWords: "Maximum consecutive repeated words",
+      maxRepeatedWordsHint:
+        "A word repeated in a row more than this many times is a violation (case-insensitive).",
     },
     keywords: {
       title: "Restricted keywords",
@@ -119,6 +117,8 @@ const en: Dictionary = {
       title: "Links & domains",
       description:
         "Only links to whitelisted domains (and their subdomains) are allowed. Every other link is blocked.",
+      allowIpAddresses: "Allow IP addresses in comments",
+      allowIpAddressesHint: "When off, comments that contain an IPv4 or IPv6 address are invalid.",
       whitelist: "Domain whitelist",
       whitelistHint: "Only links to these domains are allowed.",
       domainPlaceholder: "e.g. example.com",

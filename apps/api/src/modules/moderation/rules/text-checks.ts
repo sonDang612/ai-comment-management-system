@@ -1,30 +1,37 @@
+import { isIP, isIPv4, isIPv6 } from 'node:net';
+
 const URL_PATTERN = /(?:https?:\/\/|www\.)[^\s<>"']+/gi;
 const BARE_DOMAIN_PATTERN = /(?<![\w@.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?![\w-])/gi;
-const EMOJI_PICTOGRAPHIC_PATTERN = /\p{Extended_Pictographic}/u;
-const EMOJI_PART_PATTERN =
-  /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|[‍︎️⃣]|[\u{E0020}-\u{E007F}])+$/u;
+const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu;
+const IPV4_CANDIDATE_PATTERN = /(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/g;
+const IPV6_CANDIDATE_PATTERN =
+  /(?<![0-9a-f:.])(?:[0-9a-f]{0,4}:){2,7}(?:(?:\d{1,3}\.){3}\d{1,3}|[0-9a-f]{0,4})(?:%[0-9a-z]+)?(?![0-9a-f:.])/gi;
 const WHITESPACE_PATTERN = /\s/u;
+const INVISIBLE_FORMAT_CHARS_PATTERN = /\p{Cf}/gu;
+const CJK_FULL_STOP_PATTERN = /[。｡]/g;
+
+export interface RepeatedRun {
+  value: string;
+  run: number;
+}
 
 export function normalizeText(text: string): string {
-  return text.normalize('NFKC').toLowerCase();
+  return text
+    .normalize('NFKC')
+    .replace(INVISIBLE_FORMAT_CHARS_PATTERN, '')
+    .replace(CJK_FULL_STOP_PATTERN, '.')
+    .toLowerCase();
 }
 
 export function contentLength(content: string): number {
   return [...content.trim()].length;
 }
 
-export function isEmojiOnly(content: string): boolean {
-  const compact = content.replace(/\s+/gu, '');
-  return (
-    compact !== '' && EMOJI_PART_PATTERN.test(compact) && EMOJI_PICTOGRAPHIC_PATTERN.test(compact)
-  );
-}
-
-export function longestRepeatedRun(content: string): { char: string; run: number } {
-  let best = { char: '', run: 0 };
+export function longestRepeatedCharRun(normalizedContent: string): RepeatedRun {
+  let best: RepeatedRun = { value: '', run: 0 };
   let previous: string | null = null;
   let run = 0;
-  for (const char of content) {
+  for (const char of normalizedContent) {
     if (WHITESPACE_PATTERN.test(char)) {
       previous = null;
       run = 0;
@@ -32,14 +39,36 @@ export function longestRepeatedRun(content: string): { char: string; run: number
     }
     run = char === previous ? run + 1 : 1;
     previous = char;
-    if (run > best.run) best = { char, run };
+    if (run > best.run) best = { value: char, run };
+  }
+  return best;
+}
+
+export function longestRepeatedWordRun(normalizedContent: string): RepeatedRun {
+  let best: RepeatedRun = { value: '', run: 0 };
+  let previous: string | null = null;
+  let run = 0;
+  for (const [word] of normalizedContent.matchAll(WORD_PATTERN)) {
+    run = word === previous ? run + 1 : 1;
+    previous = word;
+    if (run > best.run) best = { value: word, run };
   }
   return best;
 }
 
 export function containsKeyword(normalizedContent: string, keyword: string): boolean {
-  const normalizedKeyword = normalizeText(keyword.trim());
+  const normalizedKeyword = normalizeText(keyword).trim();
   return normalizedKeyword !== '' && normalizedContent.includes(normalizedKeyword);
+}
+
+export function containsIpAddress(content: string): boolean {
+  for (const [candidate] of content.matchAll(IPV4_CANDIDATE_PATTERN)) {
+    if (isIPv4(candidate)) return true;
+  }
+  for (const [candidate] of content.matchAll(IPV6_CANDIDATE_PATTERN)) {
+    if (isIPv6(candidate)) return true;
+  }
+  return false;
 }
 
 export function normalizeHost(host: string): string {
@@ -49,7 +78,9 @@ export function normalizeHost(host: string): string {
 function hostOf(url: string): string | null {
   try {
     const host = new URL(url.includes('://') ? url : `http://${url}`).hostname;
-    return host ? normalizeHost(host) : null;
+    const unbracketed = host.replace(/^\[(.*)\]$/, '$1');
+    if (!host || isIP(unbracketed) !== 0) return null;
+    return normalizeHost(host);
   } catch {
     return null;
   }

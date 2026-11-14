@@ -4,12 +4,12 @@ export const DEFAULT_RULE_SETTINGS: RuleSettings = {
   validation: {
     min_length: 1,
     max_length: 1000,
-    allow_empty: false,
-    allow_emoji_only: true,
     max_repeated_chars: 10,
+    max_repeated_words: 5,
   },
   keywords: [],
   links: {
+    allow_ip_addresses: false,
     domain_whitelist: [],
   },
 };

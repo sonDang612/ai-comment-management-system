@@ -1,7 +1,7 @@
 "use client";
 
 import { RULE_SETTINGS_LIMITS, type RuleSettings } from "@acms/shared";
-import { Form, InputNumber, Switch } from "antd";
+import { Form, InputNumber } from "antd";
 import { useI18n } from "@/i18n";
 import { integerRangeRules } from "../form-rules";
 import { SettingsSectionForm } from "./settings-section-form";
@@ -19,7 +19,7 @@ export function ValidationSection({ settings }: { settings: RuleSettings }) {
       title={t.validation.title}
       description={t.validation.description}
     >
-      <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-x-6 sm:grid-cols-2 xl:grid-cols-4">
         <Form.Item
           name={MIN_LENGTH_FIELD}
           label={t.validation.minLength}
@@ -71,20 +71,17 @@ export function ValidationSection({ settings }: { settings: RuleSettings }) {
           />
         </Form.Item>
         <Form.Item
-          name={["validation", "allow_empty"]}
-          label={t.validation.allowEmpty}
-          extra={t.validation.allowEmptyHint}
-          valuePropName="checked"
+          name={["validation", "max_repeated_words"]}
+          label={t.validation.maxRepeatedWords}
+          extra={t.validation.maxRepeatedWordsHint}
+          rules={integerRangeRules(dict, RULE_SETTINGS_LIMITS.maxRepeatedWords)}
         >
-          <Switch />
-        </Form.Item>
-        <Form.Item
-          name={["validation", "allow_emoji_only"]}
-          label={t.validation.allowEmojiOnly}
-          extra={t.validation.allowEmojiOnlyHint}
-          valuePropName="checked"
-        >
-          <Switch />
+          <InputNumber
+            min={RULE_SETTINGS_LIMITS.maxRepeatedWords.min}
+            max={RULE_SETTINGS_LIMITS.maxRepeatedWords.max}
+            precision={0}
+            className="!w-full"
+          />
         </Form.Item>
       </div>
     </SettingsSectionForm>

@@ -10,12 +10,12 @@ export function toRuleSettingsDto(row: RuleSettingsRow | null): RuleSettings {
     validation: {
       min_length: row.minLength,
       max_length: row.maxLength,
-      allow_empty: row.allowEmpty,
-      allow_emoji_only: row.allowEmojiOnly,
       max_repeated_chars: row.maxRepeatedChars,
+      max_repeated_words: row.maxRepeatedWords,
     },
     keywords: row.restrictedKeywords,
     links: {
+      allow_ip_addresses: row.allowIpAddresses,
       domain_whitelist: row.domainWhitelist,
     },
   };
@@ -25,10 +25,10 @@ export function toRuleSettingsData(settings: RuleSettings): RuleSettingsData {
   return {
     minLength: settings.validation.min_length,
     maxLength: settings.validation.max_length,
-    allowEmpty: settings.validation.allow_empty,
-    allowEmojiOnly: settings.validation.allow_emoji_only,
     maxRepeatedChars: settings.validation.max_repeated_chars,
+    maxRepeatedWords: settings.validation.max_repeated_words,
     restrictedKeywords: settings.keywords,
+    allowIpAddresses: settings.links.allow_ip_addresses,
     domainWhitelist: settings.links.domain_whitelist,
   };
 }

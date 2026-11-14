@@ -3,12 +3,12 @@ import { COMMENT_CONTENT_MAX_LENGTH } from './comments.js';
 export interface CommentValidationSettings {
   min_length: number;
   max_length: number;
-  allow_empty: boolean;
-  allow_emoji_only: boolean;
   max_repeated_chars: number;
+  max_repeated_words: number;
 }
 
 export interface LinkSettings {
+  allow_ip_addresses: boolean;
   domain_whitelist: string[];
 }
 
@@ -22,6 +22,7 @@ export const RULE_SETTINGS_LIMITS = {
   minLength: { min: 0, max: COMMENT_CONTENT_MAX_LENGTH },
   maxLength: { min: 1, max: COMMENT_CONTENT_MAX_LENGTH },
   maxRepeatedChars: { min: 2, max: 100 },
+  maxRepeatedWords: { min: 2, max: 100 },
   keywordMaxLength: 100,
   maxKeywords: 500,
   domainMaxLength: 253,
@@ -49,5 +50,5 @@ export function normalizeKeyword(input: string): string {
 }
 
 export function keywordIdentity(keyword: string): string {
-  return normalizeKeyword(keyword).toLowerCase();
+  return normalizeKeyword(keyword.normalize('NFKC').replace(/\p{Cf}/gu, '')).toLowerCase();
 }

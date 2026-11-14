@@ -24,10 +24,10 @@ model RuleSettings {
   id                 Int      @id @default(1) @db.SmallInt
   minLength          Int      @map("min_length")
   maxLength          Int      @map("max_length")
-  allowEmpty         Boolean  @map("allow_empty")
-  allowEmojiOnly     Boolean  @map("allow_emoji_only")
   maxRepeatedChars   Int      @map("max_repeated_chars")
+  maxRepeatedWords   Int      @default(5) @map("max_repeated_words")
   restrictedKeywords String[] @map("restricted_keywords")
+  allowIpAddresses   Boolean  @default(false) @map("allow_ip_addresses")
   domainWhitelist    String[] @map("domain_whitelist")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)

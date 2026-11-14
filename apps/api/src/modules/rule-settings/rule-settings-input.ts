@@ -101,16 +101,20 @@ export function parseRuleSettings(body: unknown): RuleSettings {
     validation: {
       min_length: parser.integer(validation['min_length'], 'validation.min_length', RULE_SETTINGS_LIMITS.minLength),
       max_length: parser.integer(validation['max_length'], 'validation.max_length', RULE_SETTINGS_LIMITS.maxLength),
-      allow_empty: parser.boolean(validation['allow_empty'], 'validation.allow_empty'),
-      allow_emoji_only: parser.boolean(validation['allow_emoji_only'], 'validation.allow_emoji_only'),
       max_repeated_chars: parser.integer(
         validation['max_repeated_chars'],
         'validation.max_repeated_chars',
         RULE_SETTINGS_LIMITS.maxRepeatedChars,
       ),
+      max_repeated_words: parser.integer(
+        validation['max_repeated_words'],
+        'validation.max_repeated_words',
+        RULE_SETTINGS_LIMITS.maxRepeatedWords,
+      ),
     },
     keywords: parser.keywords(root['keywords'], 'keywords'),
     links: {
+      allow_ip_addresses: parser.boolean(links['allow_ip_addresses'], 'links.allow_ip_addresses'),
       domain_whitelist: parser.domains(links['domain_whitelist'], 'links.domain_whitelist'),
     },
   };

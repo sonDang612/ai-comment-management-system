@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Python AI package (apps/ai). Build context: repository root.
-# Production runs only the BullMQ worker. Online inference is served by vLLM (see docker-compose.yml),
-# and LoRA training runs offline on a GPU machine, not in this image.
+# Production runs only the BullMQ worker. Online inference is served by TEI (see docker-compose.yml),
+# and classifier training runs offline on a training machine, not in this image.
 #   docker build -f infrastructure/docker/python.Dockerfile --target ai-worker .
 
 ARG PYTHON_VERSION=3.12

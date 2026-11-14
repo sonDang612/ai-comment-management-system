@@ -1,52 +1,42 @@
-# LoRA fine-tuning of Qwen3-1.7B for comment moderation.
+# Fine-tuning of hfl/chinese-roberta-wwm-ext as a 3-class comment classifier (valid / question / invalid).
 # Relative paths resolve from the current directory: run every command from apps/ai.
 # Any value can also be overridden on the command line (see training/README.md).
 
 [model]
 # Hugging Face model id, or a local directory that holds the downloaded base model.
-base_model = "Qwen/Qwen3-1.7B"
+base_model = "hfl/chinese-roberta-wwm-ext"
 # Pin a commit hash for reproducible runs.
 # revision = "main"
 # cache_dir = "training/models/hf-cache"
 local_files_only = false
-# auto = bf16 on GPUs that support it, fp16 on other CUDA GPUs, fp32 on CPU.
+# auto = bf16 on GPUs that support it, fp16 on other CUDA GPUs (GTX 16xx), fp32 on CPU.
 precision = "auto"
-# QLoRA: loads the frozen base model in 4-bit NF4 (needs bitsandbytes and a CUDA GPU).
-load_in_4bit = false
-attn_implementation = "sdpa"
-
-[lora]
-rank = 16
-alpha = 32
-dropout = 0.05
-target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-bias = "none"
 
 [training]
-output_dir = "training/outputs/qwen3-1.7b-lora-v1"
-batch_size = 4
-gradient_accumulation_steps = 4
-learning_rate = 2e-4
-epochs = 3
-max_seq_length = 512
-# Tokens kept free for the JSON answer; longer comments are truncated to fit.
-completion_reserve_tokens = 96
-warmup_ratio = 0.05
-weight_decay = 0.0
-lr_scheduler = "cosine"
+output_dir = "training/outputs/chinese-roberta-v1"
+# 16 fits a 4 GB GPU with fp16 and max_seq_length 256 (each batch is padded to its longest comment).
+batch_size = 16
+gradient_accumulation_steps = 1
+learning_rate = 2e-5
+epochs = 4
+# BERT reads at most 512 tokens; Chinese text is about one token per character.
+max_seq_length = 256
+warmup_ratio = 0.1
+weight_decay = 0.01
+lr_scheduler = "linear"
 max_grad_norm = 1.0
 logging_steps = 10
+# The best checkpoint is chosen by macro F1 on the validation split.
 eval_steps = 100
 save_total_limit = 2
 early_stopping_patience = 3
-gradient_checkpointing = true
 seed = 42
 
 [data]
 split_dir = "training/data/splits/v1"
 
 [evaluation]
-batch_size = 8
+batch_size = 32
 # Threshold tuning on the validation split: the lowest threshold whose precision reaches the target.
 valid_target_precision = 0.95
 invalid_target_precision = 0.97

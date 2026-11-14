@@ -1,12 +1,13 @@
-# LoRA fine-tuning: Qwen3-1.7B comment moderation
+# Classifier fine-tuning: hfl/chinese-roberta-wwm-ext comment moderation
 
-Offline pipeline that trains a **LoRA adapter** on top of a frozen Qwen3-1.7B, tunes the decision thresholds on the
-validation split, and measures the result once on an untouched test split.
+Offline pipeline that fine-tunes **`hfl/chinese-roberta-wwm-ext`** (BERT, about 102M parameters) as a 3-class
+sequence classifier (`valid` / `question` / `invalid`), tunes the decision thresholds on the validation split, and
+measures the result once on an untouched test split. It trains on a 4 GB GPU (for example a GTX 1650 Ti, fp16).
 
 It is an offline entrypoint of `apps/ai` (`python -m acms_ai.training`), next to the queue worker. It imports
 only `acms_ai.core` and never touches PostgreSQL, Redis or the API. Training data comes from exported JSONL files.
-In production the adapter is served by vLLM, and the NestJS API calls vLLM directly (see the root README,
-"AI inference (vLLM)").
+The trained model folder is served by Hugging Face Text Embeddings Inference (TEI, CPU is enough), and the NestJS
+API calls TEI directly (see the root README, "AI inference (classifier)").
 
 ```
 labeled *.jsonl ──split──▶ train / validation / test (+ manifest.json with SHA-256 per file)
@@ -22,27 +23,28 @@ labeled *.jsonl ──split──▶ train / validation / test (+ manifest.json 
 
 | Path                                     | What                                                                        |
 | ---------------------------------------- | --------------------------------------------------------------------------- |
-| `src/acms_ai/training/`                  | The package: `cli`, `dataset`, `splitting`, `prompt`, `trainer`, `scoring`, `metrics`, `thresholds`, `evaluation` |
-| `training/configs/qwen3-1.7b-lora.toml`  | Default configuration (model, LoRA, training, data, evaluation)             |
+| `src/acms_ai/training/`                  | The package: `cli`, `dataset`, `splitting`, `trainer`, `scoring`, `metrics`, `thresholds`, `evaluation` |
+| `training/configs/chinese-roberta.toml`  | Default configuration (model, training, data, evaluation)                   |
 | `training/data/`                         | Your datasets and splits (git-ignored)                                      |
 | `training/models/`                       | Optional local copy of the base model (git-ignored)                         |
-| `training/outputs/<run>/`                | One folder per run: adapter, checkpoints, config, thresholds, reports (git-ignored) |
+| `training/outputs/<run>/`                | One folder per run: model, checkpoints, config, thresholds, reports (git-ignored) |
 
 Run every command **from `apps/ai`**: relative paths in the config resolve from the current directory.
 
 ## Requirements
 
-- Python packages: `torch` (CUDA build), `transformers`, `peft`, `trl`, `datasets`, `accelerate`,
-  plus `bitsandbytes` for `load_in_4bit`. They are not dependencies of the worker or of any production image.
-- An NVIDIA GPU with CUDA for real training. CPU works only for tiny dry runs.
+- Python packages: `torch` (CUDA build for GPU training), `transformers`, `accelerate`. They are not dependencies
+  of the worker or of any production image.
+- An NVIDIA GPU with CUDA is recommended. A 4 GB card is enough; CPU training works but is slow (hours instead of
+  minutes for a few thousand comments).
 
-| GPU memory | Suggested settings for Qwen3-1.7B                                                         |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| ≥ 16 GB    | Defaults (bf16/fp16, batch 4 × accumulation 4, `max_seq_length = 512`)                    |
-| 8–12 GB    | `--batch-size 2 --gradient-accumulation-steps 8`                                           |
-| 4–6 GB     | `--load-in-4bit --batch-size 1 --gradient-accumulation-steps 16 --max-seq-length 384`     |
+| GPU memory | Suggested settings                                                                 |
+| ---------- | ---------------------------------------------------------------------------------- |
+| ≥ 8 GB     | Defaults (batch 16, `max_seq_length = 256`), or `--batch-size 32`                  |
+| 4 GB       | Defaults; on out-of-memory errors `--batch-size 8 --gradient-accumulation-steps 2` |
+| CPU only   | `--precision fp32 --batch-size 8`                                                  |
 
-GPUs without bf16 (for example Turing, GTX 16xx / RTX 20xx) fall back to fp16 automatically with `precision = "auto"`.
+GPUs without bf16 (for example Turing, GTX 16xx / RTX 20xx) use fp16 automatically with `precision = "auto"`.
 
 ## Dataset format
 
@@ -61,7 +63,7 @@ One JSON object per line (UTF-8). Unknown fields are ignored.
 | `is_valid` + `is_question`   | one of   | Same fields the system stores. `is_valid: false` wins over `is_question` (violation first)    |
 | `label`                      | one of   | `valid`, `question` or `invalid`. If given with the flags, both must agree                    |
 | `comment_id`, `site_code`    | no       | Used to detect duplicates and leakage, and copied into prediction files                       |
-| `reason`                     | no       | Simplified Chinese reason the model learns to write. A default reason is used when missing    |
+| `reason`                     | no       | Ignored by the classifier: the API returns a fixed Simplified Chinese reason per label        |
 
 The model learns three classes, which map back to the system fields:
 
@@ -103,47 +105,43 @@ Use a **new split folder** (`v2`, …) when you add data, and train a new run on
 Keep the customer's **golden set** (docs 5.3.1) out of the `split` inputs: it must never be trained on. The
 pipeline does not evaluate on a separate golden file yet.
 
-## 2. Train the adapter
+## 2. Train the classifier
 
 ```bash
-python -m acms_ai.training train --config training/configs/qwen3-1.7b-lora.toml
+python -m acms_ai.training train --config training/configs/chinese-roberta.toml
 ```
 
 Override any common setting without editing the file:
 
 ```bash
-python -m acms_ai.training train --config training/configs/qwen3-1.7b-lora.toml \
-  --lora-rank 32 --lora-alpha 64 --lora-dropout 0.1 \
-  --target-modules q_proj,k_proj,v_proj,o_proj \
-  --batch-size 2 --gradient-accumulation-steps 8 \
-  --learning-rate 1e-4 --epochs 2 --max-seq-length 384 \
-  --output-dir training/outputs/qwen3-1.7b-lora-r32
+python -m acms_ai.training train --config training/configs/chinese-roberta.toml \
+  --batch-size 8 --gradient-accumulation-steps 2 \
+  --learning-rate 3e-5 --epochs 5 --max-seq-length 192 \
+  --output-dir training/outputs/chinese-roberta-v2
 ```
 
-Other flags: `--base-model`, `--precision {auto,bf16,fp16,fp32}`, `--load-in-4bit`, `--seed`, `--split-dir`,
-`--resume` (continue from the last checkpoint), `--force` (replace an existing adapter in the same folder).
+Other flags: `--base-model` (for example `hfl/rbt3`, a 3-layer version that is about 3× faster),
+`--precision {auto,bf16,fp16,fp32}`, `--seed`, `--split-dir`, `--resume` (continue from the last checkpoint),
+`--force` (replace an existing model in the same folder).
 
 How it works:
 
-- Only `train.jsonl` is used for gradient updates. `validation.jsonl` gives the validation loss for checkpoint
-  selection and early stopping. `test.jsonl` is never loaded for training.
-- The base model is loaded with every weight frozen (`requires_grad = False`). PEFT injects LoRA matrices into
-  `target_modules`, and the run aborts if any parameter outside the `lora_` weights is trainable.
-- Loss is computed on the answer tokens only (TRL `SFTTrainer`, prompt-completion format, `completion_only_loss`).
-- Prompt: a system message with the label definitions (docs 5.1 and 5.2), the comment wrapped in
-  `<comment>…</comment>` and treated as data, and a fixed JSON answer
-  `{"label": "...", "reason": "..."}`. Thinking mode is disabled. Comments that are too long are truncated so the
-  prompt and answer always fit in `max_seq_length`.
-- The base model is never saved, merged or modified. Downloads stay in the Hugging Face cache (or `cache_dir`).
+- Only `train.jsonl` is used for gradient updates. `validation.jsonl` is scored every `eval_steps`; the checkpoint
+  with the best macro F1 is kept, and early stopping uses the same metric. `test.jsonl` is never loaded for training.
+- The whole model is fine-tuned with a new 3-label head (`id2label` = `valid`, `question`, `invalid`) and
+  cross-entropy loss. There is no prompt: the comment text is the only input, truncated to `max_seq_length` tokens,
+  so instructions inside a comment cannot change the task.
+- The result is a standard Hugging Face folder (`config.json`, `model.safetensors`, `tokenizer.json` …) that TEI
+  serves as is. The base model download stays in the Hugging Face cache (or `cache_dir`).
 
 ### Local model storage
 
 To train offline from a local copy of the base model:
 
 ```bash
-hf download Qwen/Qwen3-1.7B --local-dir training/models/Qwen3-1.7B
-python -m acms_ai.training train --config training/configs/qwen3-1.7b-lora.toml \
-  --base-model training/models/Qwen3-1.7B
+hf download hfl/chinese-roberta-wwm-ext --local-dir training/models/chinese-roberta-wwm-ext
+python -m acms_ai.training train --config training/configs/chinese-roberta.toml \
+  --base-model training/models/chinese-roberta-wwm-ext
 ```
 
 You can also set `local_files_only = true` and `cache_dir` in `[model]`, or the usual `HF_HOME` variable.
@@ -151,11 +149,11 @@ You can also set `local_files_only = true` and `cache_dir` in `[model]`, or the 
 ## 3. Tune thresholds on validation
 
 ```bash
-python -m acms_ai.training tune-thresholds --run-dir training/outputs/qwen3-1.7b-lora-v1
+python -m acms_ai.training tune-thresholds --run-dir training/outputs/chinese-roberta-v1
 ```
 
-The adapter scores every validation comment. Confidence is the probability of each label, computed from the
-log-likelihood of the answer prefix `{"label": "<label>",` and normalized over the three labels (no sampling).
+The model scores every validation comment. Confidence is the softmax probability of the predicted label, the
+same value TEI returns to the API.
 
 For `valid` and `invalid`, tuning picks the **lowest threshold** (grid from `threshold_grid_min` in
 `threshold_grid_step` steps) whose precision on validation reaches the target and accepts at least `min_accepted`
@@ -168,11 +166,11 @@ Targets can be changed per run: `--valid-target-precision 0.96 --invalid-target-
 ## 4. Final evaluation on test
 
 ```bash
-python -m acms_ai.training evaluate --run-dir training/outputs/qwen3-1.7b-lora-v1 --split test
+python -m acms_ai.training evaluate --run-dir training/outputs/chinese-roberta-v1 --split test
 ```
 
 - Requires `thresholds.json` from step 3. It must have been tuned on the validation split of the **same** split
-  manifest and the **same** adapter (SHA-256 checked), so test results are never used for tuning.
+  manifest and the **same** model (SHA-256 checked), so test results are never used for tuning.
 - Runs once: a second test evaluation of the same run is refused unless you pass `--force`. Fix problems with a new
   run on train/validation, not by looking at the test set again.
 - `--split validation` gives the same report on validation (with tuned thresholds if present, defaults otherwise).
@@ -190,11 +188,11 @@ The report (printed, and saved to `evaluation/<split>_report.json`) contains:
 ## Run folder
 
 ```
-training/outputs/qwen3-1.7b-lora-v1/
-├── adapter/                      # LoRA weights only: adapter_config.json + adapter_model.safetensors
+training/outputs/chinese-roberta-v1/
+├── model/                        # served by TEI: config.json, model.safetensors, tokenizer files
 ├── checkpoints/                  # intermediate Trainer checkpoints (can be deleted after training)
-├── training_config.json          # full config, precision, prompt version, base model + commit, split manifest
-│                                 # SHA-256, trainable/total parameters, metrics, package versions, adapter SHA-256
+├── training_config.json          # full config, precision, labels, base model + commit, split manifest SHA-256,
+│                                 # parameters, metrics, package versions, model SHA-256
 ├── thresholds.json               # tuned thresholds, tuning curves, validation report
 └── evaluation/
     ├── validation_predictions.json
@@ -202,19 +200,18 @@ training/outputs/qwen3-1.7b-lora-v1/
     └── test_predictions.json
 ```
 
-`tune-thresholds` and `evaluate` read the model, LoRA and sequence settings from `training_config.json`, so
-inference always matches training. A run trained with another prompt version is refused.
+`tune-thresholds` and `evaluate` read the model and sequence settings from `training_config.json`, so inference
+always matches training. A run trained with other labels is refused.
 
-## Serving the adapter (vLLM)
+## Serving the model (TEI)
 
-Serve the same base model with the adapter, under the name the API sends as `VLLM_MODEL`:
+Serve the `model/` folder with Hugging Face Text Embeddings Inference. The CPU image is enough:
 
 ```bash
-vllm serve Qwen/Qwen3-1.7B --enable-lora --max-lora-rank 16 --max-logprobs 20 \
-  --lora-modules acms-moderation=training/outputs/qwen3-1.7b-lora-v1/adapter
+docker run --rm -p 8080:8080 -v "$PWD/training/outputs/chinese-roberta-v1/model:/model:ro" \
+  ghcr.io/huggingface/text-embeddings-inference:cpu-1.8 --model-id /model --port 8080 --auto-truncate
 ```
 
-`--max-lora-rank` must be at least the trained `lora.rank`. The API uses the same prompt as training
-(`apps/api/src/modules/moderation/analysis/moderation-prompt.ts` mirrors `acms_ai.training.prompt`): when you
-change the prompt here, bump `PROMPT_VERSION` and update the API copy too. The adapter is a few dozen MB, and
-the base model stays as published.
+Then set `TEI_URL=http://localhost:8080` in `apps/api/.env`. `GET /api/v1/health` checks that TEI serves a
+classifier with exactly the labels `valid`, `question` and `invalid`. With Docker Compose, use the `classifier`
+profile instead (root README).

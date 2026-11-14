@@ -1,24 +1,22 @@
 import logging
+from collections.abc import Sequence
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from acms_ai.training.artifacts import utc_timestamp, write_json
-from acms_ai.training.config import FineTuneConfig, ResolvedPrecision
+from acms_ai.training.config import FineTuneConfig
+from acms_ai.training.dataset import LabeledComment
 from acms_ai.training.errors import TrainingConfigError
 from acms_ai.training.labels import LABELS
-from acms_ai.training.model_loading import (
-    load_frozen_base_model,
-    load_tokenizer,
-    resolve_precision,
-)
-from acms_ai.training.prompt import PROMPT_VERSION, PromptBuilder
+from acms_ai.training.metrics import classification_metrics
+from acms_ai.training.model_loading import load_base_classifier, load_tokenizer, resolve_precision
 from acms_ai.training.run import RunDirectory
 from acms_ai.training.splitting import SplitDirectory
 
 logger = logging.getLogger(__name__)
 
-LORA_PARAMETER_MARKER = "lora_"
-RECORDED_PACKAGES = ("torch", "transformers", "peft", "trl", "datasets", "accelerate")
+RECORDED_PACKAGES = ("torch", "transformers", "accelerate")
+BEST_MODEL_METRIC = "macro_f1"
 
 
 def package_versions() -> dict[str, str | None]:
@@ -37,60 +35,45 @@ def parameter_counts(model: Any) -> dict[str, int]:
     return {"trainable": trainable, "total": total}
 
 
-def assert_only_adapters_trainable(model: Any) -> None:
-    trainable = [name for name, p in model.named_parameters() if p.requires_grad]
-    leaked = [name for name in trainable if LORA_PARAMETER_MARKER not in name]
-    if not trainable or leaked:
-        raise TrainingConfigError(
-            "Only LoRA adapter weights may be trainable",
-            details={"trainable_count": len(trainable), "non_adapter": leaked[:20]},
-        )
-
-
-def build_adapter_model(config: FineTuneConfig, precision: ResolvedPrecision) -> Any:
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-
-    model = load_frozen_base_model(config.model, precision)
-    model.config.use_cache = False
-    if config.model.load_in_4bit:
-        model = prepare_model_for_kbit_training(
-            model,
-            use_gradient_checkpointing=config.training.gradient_checkpointing,
-            gradient_checkpointing_kwargs={"use_reentrant": False},
-        )
-    lora = config.lora
-    adapter_model = get_peft_model(
-        model,
-        LoraConfig(
-            r=lora.rank,
-            lora_alpha=lora.alpha,
-            lora_dropout=lora.dropout,
-            target_modules=lora.target_modules,
-            bias=lora.bias,
-            task_type="CAUSAL_LM",
-        ),
-    )
-    for parameter in adapter_model.parameters():
-        if parameter.requires_grad:
-            parameter.data = parameter.data.float()
-    assert_only_adapters_trainable(adapter_model)
-    return adapter_model
-
-
 def ensure_output_available(run: RunDirectory, *, force: bool, resume: bool) -> None:
     if resume and not run.checkpoints_dir.is_dir():
         raise TrainingConfigError(f"No checkpoints to resume from in {run.checkpoints_dir}")
-    if run.adapter_dir.exists() and not (force or resume):
+    if run.model_dir.exists() and not (force or resume):
         raise TrainingConfigError(
-            f"{run.path} already holds a trained adapter; choose another output_dir, "
+            f"{run.path} already holds a trained model; choose another output_dir, "
             "or pass --force to replace it"
         )
 
 
+def encode_records(
+    tokenizer: Any, records: Sequence[LabeledComment], max_length: int
+) -> list[dict[str, Any]]:
+    label_ids = {label: index for index, label in enumerate(LABELS)}
+    encoded = tokenizer(
+        [record.content for record in records], truncation=True, max_length=max_length
+    )
+    return [
+        {key: values[row] for key, values in encoded.items()} | {"labels": label_ids[record.label]}
+        for row, record in enumerate(records)
+    ]
+
+
+def macro_f1_metrics(prediction: Any) -> dict[str, float]:
+    predicted_ids = prediction.predictions.argmax(axis=-1).tolist()
+    gold = [LABELS[index] for index in prediction.label_ids.tolist()]
+    predicted = [LABELS[index] for index in predicted_ids]
+    metrics = classification_metrics(gold, predicted, LABELS)
+    return {"accuracy": metrics["accuracy"], BEST_MODEL_METRIC: metrics["macro_f1"]}
+
+
 def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) -> RunDirectory:
-    from datasets import Dataset
-    from transformers import EarlyStoppingCallback, set_seed
-    from trl import SFTConfig, SFTTrainer
+    from transformers import (
+        DataCollatorWithPadding,
+        EarlyStoppingCallback,
+        Trainer,
+        TrainingArguments,
+        set_seed,
+    )
 
     settings = config.training
     run = RunDirectory(settings.output_dir)
@@ -104,27 +87,21 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
     set_seed(settings.seed)
     precision = resolve_precision(config.model)
     tokenizer = load_tokenizer(config.model)
-    builder = PromptBuilder(tokenizer, settings.max_seq_length, settings.completion_reserve_tokens)
-    builder.assert_label_alignment()
-    train_dataset = Dataset.from_list([builder.example(record) for record in train_records])
-    validation_dataset = Dataset.from_list(
-        [builder.example(record) for record in validation_records]
-    )
+    tokenizer.model_max_length = settings.max_seq_length
+    train_dataset = encode_records(tokenizer, train_records, settings.max_seq_length)
+    validation_dataset = encode_records(tokenizer, validation_records, settings.max_seq_length)
 
-    model = build_adapter_model(config, precision)
+    model = load_base_classifier(config.model)
     counts = parameter_counts(model)
     logger.info("Trainable parameters: %d of %d", counts["trainable"], counts["total"])
 
-    sft_config = SFTConfig(
+    arguments = TrainingArguments(
         output_dir=str(run.checkpoints_dir),
         per_device_train_batch_size=settings.batch_size,
         per_device_eval_batch_size=config.evaluation.batch_size,
         gradient_accumulation_steps=settings.gradient_accumulation_steps,
         learning_rate=settings.learning_rate,
         num_train_epochs=settings.epochs,
-        max_length=settings.max_seq_length,
-        completion_only_loss=True,
-        packing=False,
         warmup_ratio=settings.warmup_ratio,
         weight_decay=settings.weight_decay,
         lr_scheduler_type=settings.lr_scheduler,
@@ -136,12 +113,10 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
         save_steps=settings.eval_steps,
         save_total_limit=settings.save_total_limit,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
+        metric_for_best_model=BEST_MODEL_METRIC,
+        greater_is_better=True,
         bf16=precision == "bf16",
         fp16=precision == "fp16",
-        gradient_checkpointing=settings.gradient_checkpointing,
-        gradient_checkpointing_kwargs={"use_reentrant": False},
         seed=settings.seed,
         data_seed=settings.seed,
         report_to="none",
@@ -151,30 +126,32 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
         if settings.early_stopping_patience
         else []
     )
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,
-        args=sft_config,
+        args=arguments,
         train_dataset=train_dataset,
         eval_dataset=validation_dataset,
         processing_class=tokenizer,
+        data_collator=DataCollatorWithPadding(tokenizer),
+        compute_metrics=macro_f1_metrics,
         callbacks=callbacks,
     )
     train_result = trainer.train(resume_from_checkpoint=True if resume else None)
     validation_metrics = trainer.evaluate()
 
-    trainer.model.save_pretrained(str(run.adapter_dir))
+    trainer.save_model(str(run.model_dir))
+    tokenizer.save_pretrained(str(run.model_dir))
     write_json(
         run.training_record_path,
         {
             "created_at": utc_timestamp(),
             "config": config.model_dump(mode="json"),
             "precision": precision,
-            "prompt_version": PROMPT_VERSION,
             "labels": [label.value for label in LABELS],
             "base_model": {
                 "name": config.model.base_model,
                 "revision": config.model.revision,
-                "commit": getattr(model.get_base_model().config, "_commit_hash", None),
+                "commit": getattr(model.config, "_commit_hash", None),
             },
             "split": {
                 "dir": str(split_dir.path),
@@ -185,10 +162,10 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
             "best_checkpoint": trainer.state.best_model_checkpoint,
             "train_metrics": train_result.metrics,
             "validation_metrics": validation_metrics,
-            "adapter_dir": run.adapter_dir.name,
-            "adapter_sha256": run.adapter_fingerprint(),
+            "model_dir": run.model_dir.name,
+            "model_sha256": run.model_fingerprint(),
             "package_versions": package_versions(),
         },
     )
-    logger.info("Saved LoRA adapter to %s", run.adapter_dir)
+    logger.info("Saved the classifier to %s", run.model_dir)
     return run

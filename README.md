@@ -4,9 +4,9 @@ Monorepo for the AI Comment Moderation service (requirements: [`docs/requirement
 This is the **foundation only**: infrastructure, conventions and health checks. No business features yet.
 
 ```
-                                        online                                      offline (GPU machine)
-web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP (OpenAI API)──▶ vllm ◀── LoRA adapter ── apps/ai: acms_ai.training
-                         │   │   rules + final result      base model + adapter     (JSONL → split → train → evaluate)
+                                        online                                   offline (training machine)
+web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP /predict──▶ classifier ◀── model/ ── apps/ai: acms_ai.training
+                         │   │   rules + final result   (TEI, CPU)              (JSONL → split → train → evaluate)
                          │   └──BullMQ (Redis)──▶ ai-worker (apps/ai, BullMQ consumer)
                          │                           └── results via BullMQ events ──▶ api
                          └──Prisma──▶ PostgreSQL
@@ -16,18 +16,18 @@ web (Next.js) ──HTTP──▶ api (NestJS) ──HTTP (OpenAI API)──▶ 
 | -------------- | ---------------------------------------------------------------------------------------- |
 | Frontend       | Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, Zustand, TanStack Query |
 | Main API       | NestJS 12 (ESM), Prisma 7 (`@prisma/adapter-pg`), BullMQ producer                        |
-| AI inference   | vLLM (OpenAI-compatible API): frozen base model + trained LoRA adapter. Called by the API only |
+| AI inference   | Hugging Face TEI (CPU) serving the fine-tuned `hfl/chinese-roberta-wwm-ext` classifier. Called by the API only |
 | AI worker      | `apps/ai` → `acms_ai.worker`: BullMQ (Python) consumer of the `ai-jobs` queue            |
-| AI training    | `apps/ai` → `acms_ai.training`: PyTorch, Transformers, PEFT (LoRA), TRL. Offline only    |
+| AI training    | `apps/ai` → `acms_ai.training`: PyTorch, Transformers (sequence classification). Offline only |
 | Database       | PostgreSQL 17 (tables in the `app` schema), migrations by Prisma Migrate                 |
 | Cache / Queue  | Redis 7                                                                                  |
 | Monorepo       | Turborepo + pnpm workspace (JS), uv workspace (Python)                                  |
 | Infrastructure | Docker Compose                                                                           |
 
 **Who owns what.** The NestJS API is the only public backend and the only owner of the database schema.
-The API runs the rule checks, calls vLLM directly for inference, validates the answer and decides what is stored.
-vLLM only runs the model. `apps/ai` is one Python package: the worker runs queue jobs, and the training CLI builds
-LoRA adapters offline. Python never writes business tables directly: results go back to the API.
+The API runs the rule checks, calls the classifier (TEI) directly for inference, validates the scores and decides
+what is stored. TEI only runs the model. `apps/ai` is one Python package: the worker runs queue jobs, and the
+training CLI fine-tunes the classifier offline. Python never writes business tables directly: results go back to the API.
 
 ## Repository layout
 
@@ -43,15 +43,15 @@ LoRA adapters offline. Python never writes business tables directly: results go 
 │   │   └── src/
 │   │       ├── common/           # request context, AppException, global filter, logger
 │   │       ├── config/env.ts     # validated env schema
-│   │       ├── infrastructure/   # prisma, redis, queue (BullMQ), vllm (HTTP client)
+│   │       ├── infrastructure/   # prisma, redis, queue (BullMQ), tei (HTTP client)
 │   │       ├── modules/<x>/      # feature modules (controller / service)
 │   │       └── generated/prisma/ # generated client (git-ignored)
 │   └── ai/                       # Python: one package (acms_ai): worker + offline training
 │       ├── src/acms_ai/
 │       │   ├── core/             # shared: settings base, logging, request context, AppError
 │       │   ├── worker/           # BullMQ consumer, processor, jobs/, healthcheck
-│       │   └── training/         # offline: LoRA fine-tuning CLI (python -m acms_ai.training)
-│       ├── training/             # LoRA configs + docs; data/, models/, outputs/ are git-ignored
+│       │   └── training/         # offline: classifier fine-tuning CLI (python -m acms_ai.training)
+│       ├── training/             # training configs + docs; data/, models/, outputs/ are git-ignored
 ├── packages/
 │   └── shared/                   # TS contracts: error envelope, health types, queue + job names
 ├── infrastructure/docker/        # api / python / web Dockerfiles + docker-compose.yml
@@ -84,7 +84,7 @@ Other environments use the same wrapper with their own files, e.g.
 | API      | http://localhost:4000/api/v1          |
 | Health   | http://localhost:4000/api/v1/health   |
 
-The `vllm` service needs an NVIDIA GPU and starts only with `--profile vllm` (see [AI inference](#ai-inference-vllm)).
+The `classifier` service needs a trained model folder and starts only with `--profile classifier` (see [AI inference](#ai-inference-classifier)).
 It is not published to the host: only the API calls it, inside the Compose network.
 The `migrate` service runs `prisma migrate deploy` once, and `api` starts only after it succeeds.
 To stop the stack, run `pnpm docker:down`. Data volumes are kept; remove them only on purpose with `pnpm docker <env> down -v`.
@@ -103,7 +103,7 @@ pnpm dev                                           # web :3000, api :4000, ai-wo
 pnpm --filter @acms/api queue:smoke             # optional: API -> queue -> worker round trip
 ```
 
-Without a vLLM server, set `AI_ANALYZER=stub` in `apps/api/.env`, or point `VLLM_URL` at a running vLLM.
+Without a classifier server, set `AI_ANALYZER=stub` in `apps/api/.env`, or point `TEI_URL` at a running TEI.
 You can also run one app on its own, e.g. `pnpm turbo run dev --filter @acms/api`, or
 `pnpm --filter @acms/ai dev` for the AI worker.
 
@@ -153,49 +153,52 @@ pnpm db:status
 - Results return to the API through BullMQ events (`AiJobsEvents`).
 - Redis runs with `maxmemory-policy noeviction`, as BullMQ requires.
 
-## AI inference (vLLM)
+## AI inference (classifier)
 
 `ModerationService` runs the rule checks first. Only when every rule passes does it ask the configured analyzer
 (`AI_ANALYZER`):
 
-- `vllm` (default): `VllmCommentAnalyzer` sends the comment to vLLM's `/v1/chat/completions` with the same prompt
-  as training (`modules/moderation/analysis/moderation-prompt.ts`, mirrors `acms_ai.training.prompt`), JSON schema
-  output, temperature 0 and token logprobs. The answer is validated (`label` in `valid` / `question` / `invalid`,
-  `reason` a string), and the confidence is the probability of the chosen label among the three labels.
+- `classifier` (default): `ClassifierCommentAnalyzer` sends the comment text to TEI's `POST /predict`. TEI serves
+  the `model/` folder of a training run: `hfl/chinese-roberta-wwm-ext` fine-tuned as a 3-class classifier. The scores
+  are validated (exactly the labels `valid` / `question` / `invalid`, probabilities that sum to 1). The predicted
+  label is the one with the highest probability, the confidence is that probability, and the reason is a fixed
+  Simplified Chinese text per label (`modules/moderation/analysis/moderation-labels.ts`). There is no prompt, so
+  the comment cannot carry instructions.
 - `stub`: marks every comment that passes the rules as valid. Allowed only when `APP_ENV` is `local`, `test` or
   `development`; the API refuses to start otherwise.
 
-Fail-safe: a timeout (`VLLM_TIMEOUT_MS`), a transport or HTTP error, an invalid answer or a missing confidence
-leaves the comment **unchecked** (result fields `null`). A non-question answer below `AI_CONFIDENCE_THRESHOLD` is
-also left unchecked. Nothing is ever marked valid because inference failed.
+Fail-safe: a timeout (`TEI_TIMEOUT_MS`), a transport or HTTP error or invalid scores leave the comment
+**unchecked** (result fields `null`). A non-question answer below `AI_CONFIDENCE_THRESHOLD` is also left
+unchecked. Nothing is ever marked valid because inference failed.
 
-| Variable (apps/api)       | Default            | Meaning                                                          |
-| ------------------------- | ------------------ | ---------------------------------------------------------------- |
-| `AI_ANALYZER`             | `vllm`             | `vllm` or `stub` (stub: local/test/development only)             |
-| `AI_CONFIDENCE_THRESHOLD` | `0.85`             | Minimum confidence to store a non-question AI result             |
-| `VLLM_URL`                | `http://localhost:8000` | vLLM server root (Compose: `VLLM_COMPOSE_URL`, default `http://vllm:8000`) |
-| `VLLM_MODEL`              | `acms-moderation`  | Served LoRA adapter name (`--lora-modules <name>=<dir>`)         |
-| `VLLM_API_KEY`            | empty              | Bearer token, if vLLM was started with an API key                |
-| `VLLM_TIMEOUT_MS`         | `30000`            | Inference timeout                                                |
+| Variable (apps/api)       | Default                 | Meaning                                                                      |
+| ------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `AI_ANALYZER`             | `classifier`            | `classifier` or `stub` (stub: local/test/development only)                   |
+| `AI_CONFIDENCE_THRESHOLD` | `0.85`                  | Minimum confidence to store a non-question AI result                         |
+| `TEI_URL`                 | `http://localhost:8080` | TEI server root (Compose: `CLASSIFIER_COMPOSE_URL`, default `http://classifier:8080`) |
+| `TEI_API_KEY`             | empty                   | Bearer token, if TEI was started with `--api-key`                            |
+| `TEI_TIMEOUT_MS`          | `30000`                 | Inference timeout                                                            |
 
-Run vLLM with the base model and the adapter of a training run (the base model is never modified):
+Run TEI with the model folder of a training run (the CPU image is enough):
 
 ```bash
-# Docker (GPU host): uses VLLM_BASE_MODEL, VLLM_ADAPTER_DIR, VLLM_MODEL ... from apps/api/.env.<env>
-pnpm docker production --profile vllm up -d
+# Docker: uses CLASSIFIER_MODEL_DIR, CLASSIFIER_IMAGE_TAG from apps/api/.env.<env>
+pnpm docker production --profile classifier up -d
 
 # Or directly:
-vllm serve Qwen/Qwen3-1.7B --enable-lora --max-lora-rank 16 --max-logprobs 20 \
-  --lora-modules acms-moderation=apps/ai/training/outputs/qwen3-1.7b-lora-v1/adapter
+docker run --rm -p 8080:8080 -v "$PWD/apps/ai/training/outputs/chinese-roberta-v1/model:/model:ro" \
+  ghcr.io/huggingface/text-embeddings-inference:cpu-1.8 --model-id /model --port 8080 --auto-truncate
 ```
 
-`GET /api/v1/health` reports `ai_service` as healthy when vLLM lists `VLLM_MODEL` (or always, with the stub).
+`GET /api/v1/health` reports `ai_service` as healthy when TEI serves a classifier with exactly the three moderation
+labels (or always, with the stub).
 
-## LoRA fine-tuning (offline)
+## Classifier fine-tuning (offline)
 
-`acms_ai.training` trains a LoRA adapter for Qwen3-1.7B on labeled JSONL exports, tunes thresholds on the
-validation split and evaluates once on a held-out test split. The base model stays frozen and unmodified.
-It runs on a GPU machine, not in the production containers; its adapter is then served by vLLM. See [`apps/ai/training/README.md`](apps/ai/training/README.md).
+`acms_ai.training` fine-tunes `hfl/chinese-roberta-wwm-ext` as a 3-class classifier on labeled JSONL exports,
+tunes thresholds on the validation split and evaluates once on a held-out test split. A 4 GB GPU is enough.
+It runs on a training machine, not in the production containers; its `model/` folder is then served by TEI.
+See [`apps/ai/training/README.md`](apps/ai/training/README.md).
 
 ## Environment variables
 
@@ -213,7 +216,7 @@ Each app has **one template, `.env.example`**, for all of its env files:
 | `apps/web/.env.<env>`                  | `web` image build args (`NEXT_PUBLIC_*`)  |
 
 The templates use host values (`localhost`). Inside Docker, Compose overrides the in-network addresses:
-`DATABASE_URL` (built from `POSTGRES_*`), `REDIS_URL` and `VLLM_URL`, plus `APP_ENV`, `NODE_ENV`, `PORT` and `TZ`.
+`DATABASE_URL` (built from `POSTGRES_*`), `REDIS_URL` and `TEI_URL`, plus `APP_ENV`, `NODE_ENV`, `PORT` and `TZ`.
 
 `<env>` is `development`, `staging` or `production`. `pnpm docker <env> …` (`scripts/docker.mjs`) does three things:
 
@@ -227,7 +230,7 @@ git-ignored. Real environment variables always take precedence.
 
 Values that must agree across files:
 
-- `VLLM_API_KEY` (apps/api) = the API key vLLM runs with, and `VLLM_MODEL` = its `--lora-modules` name.
+- `TEI_API_KEY` (apps/api) = the `--api-key` TEI runs with (empty when TEI has no key).
 - `POSTGRES_USER/PASSWORD/DB` in `apps/api/.env.<env>` create the database, and Compose builds the in-network
   `DATABASE_URL` from them (keep the password URL-safe). On the host, `DATABASE_URL` in `apps/api/.env` must use
   the same credentials as `apps/api/.env.development`.
@@ -255,12 +258,12 @@ Clients read `data`. In the API, `ResponseEnvelopeInterceptor` wraps what contro
   `src/common/errors/app.exception.ts`. Nest `HttpException`s and Prisma `P2002`/`P2025` are mapped too.
   Unexpected errors are logged with a stack trace and returned as a generic `internal_error`.
 - AI (worker and training): raise an `AppError` subclass from `acms_ai.core.errors`.
-- vLLM failures never reach the browser: the comment stays unchecked and the API logs a warning.
+- Classifier (TEI) failures never reach the browser: the comment stays unchecked and the API logs a warning.
 - Web: `apiClient` throws `ApiError` (`status`, `code`, `details`, `requestId`).
 - The shared types live in `packages/shared/src/api.ts`.
 
 **Request ids.** Clients may send `X-Request-ID`. Otherwise one is generated. It is echoed in the response,
-added to every log line, forwarded to vLLM and attached to queued jobs.
+added to every log line, forwarded to TEI and attached to queued jobs.
 
 **Health checks.**
 
@@ -268,7 +271,7 @@ added to every log line, forwarded to vLLM and attached to queued jobs.
 | -------------------------------- | -------------------------------------------------------------- |
 | `GET :4000/api/v1/health`        | Readiness: database, redis, ai_service, worker. 503 if degraded |
 | `GET :4000/api/v1/health/live`   | API liveness (Docker healthcheck)                              |
-| `GET vllm:8000/health`           | vLLM liveness (Compose healthcheck)                            |
+| `classifier:8080` (TCP)          | TEI liveness (Compose healthcheck)                             |
 | `python -m acms_ai.worker.healthcheck` | AI worker liveness (heartbeat file)                      |
 | `GET :3000/api/health`           | Web liveness                                                   |
 
@@ -306,6 +309,6 @@ locale-prefixed URLs: `/zh-CN/...`, `/en/...`.
 - **Web shows "API unreachable"**: check `NEXT_PUBLIC_API_URL`, and that the web origin is listed in `CORS_ORIGINS`.
   For the Docker image, rebuild after changing it (it is a build arg).
 - **Health shows `worker: No workers connected`**: start the AI worker, and check that it uses the same `REDIS_URL` (and db) as the API.
-- **Health shows `ai_service` error**: check that vLLM is running, that `VLLM_URL` is correct, that it serves `VLLM_MODEL`, and that `VLLM_API_KEY` matches.
-- **Comments stay unchecked**: look for `Analysis failed` or `below` in the API log (vLLM error, timeout, invalid answer, or confidence below `AI_CONFIDENCE_THRESHOLD`).
+- **Health shows `ai_service` error**: check that TEI is running, that `TEI_URL` is correct, that it serves the trained `model/` folder (labels `valid`, `question`, `invalid`), and that `TEI_API_KEY` matches.
+- **Comments stay unchecked**: look for `Analysis failed` or `below` in the API log (TEI error, timeout, invalid scores, or confidence below `AI_CONFIDENCE_THRESHOLD`).
 - **`Invalid environment configuration`** on API start: the message lists every invalid variable. Compare with `apps/api/.env.example`.

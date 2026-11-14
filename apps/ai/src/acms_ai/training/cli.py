@@ -17,11 +17,6 @@ logger = logging.getLogger("acms_ai.training")
 TRAINING_OVERRIDE_FLAGS: dict[str, str] = {
     "base_model": "model.base_model",
     "precision": "model.precision",
-    "load_in_4bit": "model.load_in_4bit",
-    "lora_rank": "lora.rank",
-    "lora_alpha": "lora.alpha",
-    "lora_dropout": "lora.dropout",
-    "target_modules": "lora.target_modules",
     "batch_size": "training.batch_size",
     "gradient_accumulation_steps": "training.gradient_accumulation_steps",
     "learning_rate": "training.learning_rate",
@@ -37,10 +32,6 @@ EVALUATION_OVERRIDE_FLAGS: tuple[str, ...] = (
     "invalid_target_precision",
     "min_accepted",
 )
-
-
-def comma_list(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def run_split(args: argparse.Namespace) -> None:
@@ -75,7 +66,7 @@ def run_train(args: argparse.Namespace) -> None:
 
     overrides = {path: getattr(args, flag) for flag, path in TRAINING_OVERRIDE_FLAGS.items()}
     run = train(load_config(args.config, overrides), force=args.force, resume=args.resume)
-    print(f"Adapter saved to {run.adapter_dir}")
+    print(f"Model saved to {run.model_dir}")
 
 
 def evaluation_overrides(args: argparse.Namespace) -> dict[str, Any]:
@@ -119,7 +110,7 @@ def add_evaluation_flags(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m acms_ai.training",
-        description="LoRA fine-tuning of the comment moderation model",
+        description="Fine-tuning of the comment moderation classifier",
     )
     parser.add_argument("--log-level", default="INFO")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -135,15 +126,10 @@ def build_parser() -> argparse.ArgumentParser:
     split.add_argument("--force", action="store_true", help="replace an existing split")
     split.set_defaults(handler=run_split)
 
-    train = commands.add_parser("train", help="train a LoRA adapter on the train split")
+    train = commands.add_parser("train", help="fine-tune the classifier on the train split")
     train.add_argument("--config", type=Path)
     train.add_argument("--base-model")
     train.add_argument("--precision", choices=["auto", "bf16", "fp16", "fp32"])
-    train.add_argument("--load-in-4bit", action="store_true", default=None)
-    train.add_argument("--lora-rank", type=int)
-    train.add_argument("--lora-alpha", type=int)
-    train.add_argument("--lora-dropout", type=float)
-    train.add_argument("--target-modules", type=comma_list, help="comma separated")
     train.add_argument("--batch-size", type=int)
     train.add_argument("--gradient-accumulation-steps", type=int)
     train.add_argument("--learning-rate", type=float)
@@ -153,14 +139,14 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--seed", type=int)
     train.add_argument("--split-dir", type=Path)
     train.add_argument("--resume", action="store_true", help="resume from the last checkpoint")
-    train.add_argument("--force", action="store_true", help="replace an existing adapter")
+    train.add_argument("--force", action="store_true", help="replace an existing model")
     train.set_defaults(handler=run_train)
 
     tune = commands.add_parser("tune-thresholds", help="tune thresholds on the validation split")
     add_evaluation_flags(tune)
     tune.set_defaults(handler=run_tune)
 
-    evaluate = commands.add_parser("evaluate", help="evaluate the adapter on a held-out split")
+    evaluate = commands.add_parser("evaluate", help="evaluate the model on a held-out split")
     add_evaluation_flags(evaluate)
     evaluate.add_argument(
         "--split", choices=[n for n in SPLIT_NAMES if n != "train"], default="test"

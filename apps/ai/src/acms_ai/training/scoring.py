@@ -1,15 +1,10 @@
-import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from acms_ai.training.config import FineTuneConfig
+from acms_ai.training.errors import ArtifactMismatchError
 from acms_ai.training.labels import LABELS, ModerationLabel
-from acms_ai.training.model_loading import (
-    load_frozen_base_model,
-    load_tokenizer,
-    resolve_precision,
-)
-from acms_ai.training.prompt import PromptBuilder, label_prefix
+from acms_ai.training.model_loading import label_mappings, load_trained_classifier
 from acms_ai.training.run import RunDirectory
 
 
@@ -26,30 +21,21 @@ class LabelScores:
         return self.probabilities[self.predicted]
 
 
-def softmax(log_scores: Sequence[float]) -> list[float]:
-    peak = max(log_scores)
-    exponents = [math.exp(score - peak) for score in log_scores]
-    total = sum(exponents)
-    return [value / total for value in exponents]
-
-
-class AdapterScorer:
+class ClassifierScorer:
     def __init__(self, run: RunDirectory, config: FineTuneConfig) -> None:
-        from peft import PeftModel
+        import torch
 
-        tokenizer = load_tokenizer(config.model)
-        base_model = load_frozen_base_model(config.model, resolve_precision(config.model))
-        self._model = PeftModel.from_pretrained(
-            base_model, str(run.adapter_dir), is_trainable=False
-        )
-        self._model.eval()
-        self._device = next(self._model.parameters()).device
-        self._pad_id = tokenizer.pad_token_id
-        self._builder = PromptBuilder(
-            tokenizer, config.training.max_seq_length, config.training.completion_reserve_tokens
-        )
-        self._builder.assert_label_alignment()
-        self._candidates = {label: self._builder.encode(label_prefix(label)) for label in LABELS}
+        self._tokenizer, model = load_trained_classifier(str(run.model_dir))
+        trained_labels = {int(index): name for index, name in model.config.id2label.items()}
+        expected_labels, _ = label_mappings()
+        if trained_labels != expected_labels:
+            raise ArtifactMismatchError(
+                "The trained model has other labels",
+                details={"trained": trained_labels, "expected": expected_labels},
+            )
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._model = model.to(self._device).eval()
+        self._max_length = config.training.max_seq_length
 
     def score(self, contents: Sequence[str], batch_size: int) -> list[LabelScores]:
         results: list[LabelScores] = []
@@ -60,40 +46,13 @@ class AdapterScorer:
     def _score_batch(self, contents: Sequence[str]) -> list[LabelScores]:
         import torch
 
-        sequences: list[list[int]] = []
-        spans: list[int] = []
-        for content in contents:
-            prompt_ids = self._builder.encode(self._builder.prompt(content))
-            for label in LABELS:
-                candidate = self._candidates[label]
-                sequences.append(prompt_ids + candidate)
-                spans.append(len(candidate))
-
-        width = max(len(sequence) for sequence in sequences)
-        kept = max(spans) + 1
-        input_ids = torch.full((len(sequences), width), self._pad_id, dtype=torch.long)
-        attention_mask = torch.zeros_like(input_ids)
-        for row, sequence in enumerate(sequences):
-            input_ids[row, width - len(sequence) :] = torch.tensor(sequence, dtype=torch.long)
-            attention_mask[row, width - len(sequence) :] = 1
-        position_ids = (attention_mask.cumsum(-1) - 1).clamp(min=0)
-
+        encoded = self._tokenizer(
+            list(contents),
+            truncation=True,
+            max_length=self._max_length,
+            padding=True,
+            return_tensors="pt",
+        ).to(self._device)
         with torch.inference_mode():
-            logits = self._model(
-                input_ids=input_ids.to(self._device),
-                attention_mask=attention_mask.to(self._device),
-                position_ids=position_ids.to(self._device),
-                logits_to_keep=kept,
-            ).logits
-            log_probs = logits.float().log_softmax(dim=-1)
-            sequence_scores: list[float] = []
-            for row, span in enumerate(spans):
-                targets = input_ids[row, width - span :].to(self._device)
-                predicting = log_probs[row, kept - span - 1 : kept - 1]
-                sequence_scores.append(predicting.gather(-1, targets.unsqueeze(-1)).sum().item())
-
-        results: list[LabelScores] = []
-        for start in range(0, len(sequence_scores), len(LABELS)):
-            probabilities = softmax(sequence_scores[start : start + len(LABELS)])
-            results.append(LabelScores(dict(zip(LABELS, probabilities, strict=True))))
-        return results
+            probabilities = self._model(**encoded).logits.float().softmax(dim=-1).cpu().tolist()
+        return [LabelScores(dict(zip(LABELS, row, strict=True))) for row in probabilities]

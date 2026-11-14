@@ -10,7 +10,7 @@ from acms_ai.training.errors import ArtifactMismatchError, TrainingConfigError
 from acms_ai.training.labels import LABELS, ModerationLabel, flags_from_label
 from acms_ai.training.metrics import binary_metrics, classification_metrics
 from acms_ai.training.run import RunDirectory
-from acms_ai.training.scoring import AdapterScorer, LabelScores
+from acms_ai.training.scoring import ClassifierScorer, LabelScores
 from acms_ai.training.splitting import SplitName
 from acms_ai.training.thresholds import (
     Thresholds,
@@ -29,7 +29,7 @@ def score_split(
 ) -> tuple[list[LabeledComment], list[LabelScores]]:
     records = run.split_directory(config).load(split)
     logger.info("Scoring %d %s records", len(records), split)
-    scorer = AdapterScorer(run, config)
+    scorer = ClassifierScorer(run, config)
     scores = scorer.score([record.content for record in records], config.evaluation.batch_size)
     return records, scores
 
@@ -111,7 +111,7 @@ def tune(run: RunDirectory, evaluation_overrides: Mapping[str, Any]) -> dict[str
         "tuned_at": utc_timestamp(),
         "split": TUNING_SPLIT,
         "split_manifest_sha256": run.training_record["split"]["manifest_sha256"],
-        "adapter_sha256": run.adapter_fingerprint(),
+        "model_sha256": run.model_fingerprint(),
         "thresholds": thresholds.model_dump(),
         "evaluation_settings": config.evaluation.model_dump(),
         "tuning": tuning,
@@ -135,8 +135,8 @@ def load_tuned_thresholds(run: RunDirectory, path: Path) -> Thresholds:
         raise ArtifactMismatchError("Thresholds must be tuned on the validation split")
     if payload.get("split_manifest_sha256") != run.training_record["split"]["manifest_sha256"]:
         raise ArtifactMismatchError("The thresholds were tuned on another dataset split")
-    if payload.get("adapter_sha256") != run.adapter_fingerprint():
-        raise ArtifactMismatchError("The thresholds were tuned for another adapter")
+    if payload.get("model_sha256") != run.model_fingerprint():
+        raise ArtifactMismatchError("The thresholds were tuned for another model")
     return Thresholds.model_validate(payload["thresholds"])
 
 
@@ -168,7 +168,7 @@ def evaluate(
     report = {
         "evaluated_at": utc_timestamp(),
         "split": split,
-        "adapter_sha256": run.adapter_fingerprint(),
+        "model_sha256": run.model_fingerprint(),
         "split_manifest_sha256": run.training_record["split"]["manifest_sha256"],
         **build_report(records, scores, thresholds, config.evaluation),
     }

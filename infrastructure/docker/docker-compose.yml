@@ -12,13 +12,13 @@
 # Only values that are fixed for every environment are written here.
 # Host ports default to 5432/6379/4000/3000; override with POSTGRES_PORT, REDIS_PORT, API_PORT, WEB_PORT.
 #
-#   web (Next.js) --HTTP--> api (NestJS) --HTTP (OpenAI API)--> vllm (base model + LoRA adapter, GPU)
+#   web (Next.js) --HTTP--> api (NestJS) --HTTP--> classifier (TEI: fine-tuned chinese-roberta, CPU)
 #                            |  \--BullMQ (Redis)--> ai-worker (apps/ai, BullMQ consumer)
 #                            \--Prisma--> postgres
 #
-# vllm needs an NVIDIA GPU, so it only starts with its profile:
-#   pnpm docker <env> --profile vllm up -d
-# Without it, point VLLM_COMPOSE_URL at a vLLM server elsewhere, or use AI_ANALYZER=stub (local/test/development).
+# classifier needs a trained model folder, so it only starts with its profile:
+#   pnpm docker <env> --profile classifier up -d
+# Without it, point CLASSIFIER_COMPOSE_URL at a TEI server elsewhere, or use AI_ANALYZER=stub (local/test/development).
 
 # One isolated project per environment: separate containers, networks and data volumes.
 name: acms-${APP_ENV:?run through scripts/docker.mjs (pnpm docker <env> ...)}
@@ -33,7 +33,7 @@ x-common-env: &common-env
 x-api-network-env: &api-network-env
   DATABASE_URL: postgresql://${POSTGRES_USER:?set in apps/api/.env.<env>}:${POSTGRES_PASSWORD:?set in apps/api/.env.<env>}@postgres:5432/${POSTGRES_DB:?set in apps/api/.env.<env>}?schema=app
   REDIS_URL: redis://redis:6379/0
-  VLLM_URL: ${VLLM_COMPOSE_URL:-http://vllm:8000}
+  TEI_URL: ${CLASSIFIER_COMPOSE_URL:-http://classifier:8080}
 
 x-api-build: &api-build
   context: ../..
@@ -122,42 +122,27 @@ services:
       redis:
         condition: service_healthy
 
-  # Inference only: OpenAI-compatible API serving the frozen base model with the trained LoRA adapter.
-  # Internal: not published to the host. Only the API calls it. VLLM_* values come from apps/api/.env.<env>.
-  vllm:
-    profiles: [vllm]
-    image: vllm/vllm-openai:${VLLM_IMAGE_TAG:-v0.11.0}
+  # Inference only: Hugging Face Text Embeddings Inference serving the fine-tuned classifier (CPU image).
+  # Internal: not published to the host. Only the API calls it (POST /predict).
+  classifier:
+    profiles: [classifier]
+    image: ghcr.io/huggingface/text-embeddings-inference:${CLASSIFIER_IMAGE_TAG:-cpu-1.8}
     restart: unless-stopped
     environment:
       <<: *common-env
-      VLLM_API_KEY: ${VLLM_API_KEY:-}
-      HF_HUB_OFFLINE: ${VLLM_HF_HUB_OFFLINE:-0}
+      HF_HUB_OFFLINE: 1
     command:
-      - --model=${VLLM_BASE_MODEL:-Qwen/Qwen3-1.7B}
-      - --enable-lora
-      - --lora-modules=${VLLM_MODEL:-acms-moderation}=/adapters/moderation
-      - --max-lora-rank=${VLLM_MAX_LORA_RANK:-16}
-      - --max-model-len=${VLLM_MAX_MODEL_LEN:-4096}
-      - --gpu-memory-utilization=${VLLM_GPU_MEMORY_UTILIZATION:-0.85}
-      - --max-logprobs=20
-      - --port=8000
+      - --model-id=/model
+      - --port=8080
+      - --auto-truncate
     volumes:
-      # Trained adapter folder (`<run>/adapter`), relative to this file. Read-only: vLLM never changes it.
-      - ${VLLM_ADAPTER_DIR:-../../apps/ai/training/outputs/qwen3-1.7b-lora-v1/adapter}:/adapters/moderation:ro
-      - vllm-cache:/root/.cache/huggingface
-    ipc: host
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      # Trained model folder (`<run>/model`), relative to this file. Read-only: TEI never changes it.
+      - ${CLASSIFIER_MODEL_DIR:-../../apps/ai/training/outputs/chinese-roberta-v1/model}:/model:ro
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
       interval: 15s
       timeout: 5s
-      start_period: 300s
+      start_period: 60s
       retries: 5
 
   ai-worker:
@@ -192,4 +177,3 @@ services:
 volumes:
   postgres-data:
   redis-data:
-  vllm-cache:

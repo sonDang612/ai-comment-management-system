@@ -1,7 +1,7 @@
 [project]
 name = "acms-ai"
 version = "0.1.0"
-description = "AI Comment Moderation - AI package: queue worker (BullMQ) + offline LoRA training"
+description = "AI Comment Moderation - AI package: queue worker (BullMQ) + offline classifier training"
 requires-python = ">=3.12"
 dependencies = [
   "bullmq>=3.6",

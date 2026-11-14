@@ -8,7 +8,7 @@
 const APP_ENVS = ['local', 'test', 'development', 'staging', 'production'] as const;
 const LOG_LEVELS = ['verbose', 'debug', 'log', 'warn', 'error', 'fatal'] as const;
 const LOG_FORMATS = ['text', 'json'] as const;
-const AI_ANALYZERS = ['vllm', 'stub'] as const;
+const AI_ANALYZERS = ['classifier', 'stub'] as const;
 const STUB_ANALYZER_ENVS: readonly AppEnv[] = ['local', 'test', 'development'];
 
 export type AppEnv = (typeof APP_ENVS)[number];
@@ -27,10 +27,9 @@ export interface Env {
   REDIS_URL: string;
   AI_ANALYZER: AiAnalyzer;
   AI_CONFIDENCE_THRESHOLD: number;
-  VLLM_URL: string;
-  VLLM_MODEL: string;
-  VLLM_API_KEY: string;
-  VLLM_TIMEOUT_MS: number;
+  TEI_URL: string;
+  TEI_API_KEY: string;
+  TEI_TIMEOUT_MS: number;
 }
 
 type Raw = Record<string, unknown>;
@@ -105,12 +104,11 @@ export function validateEnv(raw: Raw): Env {
     LOG_FORMAT: env.oneOf('LOG_FORMAT', LOG_FORMATS, 'text'),
     DATABASE_URL: env.url('DATABASE_URL', ['postgresql:', 'postgres:']),
     REDIS_URL: env.url('REDIS_URL', ['redis:', 'rediss:'], 'redis://localhost:6379/0'),
-    AI_ANALYZER: env.oneOf('AI_ANALYZER', AI_ANALYZERS, 'vllm'),
+    AI_ANALYZER: env.oneOf('AI_ANALYZER', AI_ANALYZERS, 'classifier'),
     AI_CONFIDENCE_THRESHOLD: env.number('AI_CONFIDENCE_THRESHOLD', 0.85, 0, 1),
-    VLLM_URL: env.url('VLLM_URL', ['http:', 'https:'], 'http://localhost:8000'),
-    VLLM_MODEL: env.string('VLLM_MODEL', 'acms-moderation'),
-    VLLM_API_KEY: env.string('VLLM_API_KEY', ''),
-    VLLM_TIMEOUT_MS: env.int('VLLM_TIMEOUT_MS', 30_000),
+    TEI_URL: env.url('TEI_URL', ['http:', 'https:'], 'http://localhost:8080'),
+    TEI_API_KEY: env.string('TEI_API_KEY', ''),
+    TEI_TIMEOUT_MS: env.int('TEI_TIMEOUT_MS', 30_000),
   };
   if (result.AI_ANALYZER === 'stub' && !STUB_ANALYZER_ENVS.includes(result.APP_ENV)) {
     env.errors.push(`AI_ANALYZER=stub is only allowed when APP_ENV is ${STUB_ANALYZER_ENVS.join(', ')}`);

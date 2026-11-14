@@ -49,7 +49,9 @@ Python never writes business tables directly: results go back to the API.
 │       │   ├── core/             # shared: settings base, logging, request context, AppError
 │       │   ├── modules/<x>/      # shared feature logic (service.py), plus router.py/schemas.py
 │       │   ├── server/           # entrypoint 1: FastAPI app, middleware, auth, error envelope
-│       │   └── worker/           # entrypoint 2: BullMQ consumer, processor, jobs/, healthcheck
+│       │   ├── worker/           # entrypoint 2: BullMQ consumer, processor, jobs/, healthcheck
+│       │   └── training/         # offline: LoRA fine-tuning CLI (python -m acms_ai.training)
+│       ├── training/             # LoRA configs + docs; data/, models/, outputs/ are git-ignored
 ├── packages/
 │   └── shared/                   # TS contracts: error envelope, health types, queue + job names
 ├── infrastructure/docker/        # api / python / web Dockerfiles + docker-compose.yml
@@ -151,6 +153,12 @@ pnpm db:status
   (jobs are retried 3× with exponential backoff) and return JSON-serializable results.
 - Results return to the API through BullMQ events (`AiJobsEvents`).
 - Redis runs with `maxmemory-policy noeviction`, as BullMQ requires.
+
+## LoRA fine-tuning (offline)
+
+`acms_ai.training` trains a LoRA adapter for Qwen3-1.7B on labeled JSONL exports, tunes thresholds on the
+validation split and evaluates once on a held-out test split. The base model stays frozen and unmodified.
+It runs on a GPU machine, not in the server or worker containers. See [`apps/ai/training/README.md`](apps/ai/training/README.md).
 
 ## Environment variables
 

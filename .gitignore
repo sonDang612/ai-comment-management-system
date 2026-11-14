@@ -37,3 +37,8 @@ pnpm-debug.log*
 
 # Next.js generated types
 next-env.d.ts
+
+# LoRA fine-tuning: datasets, local base models and run outputs stay on the training machine
+apps/ai/training/data/
+apps/ai/training/models/
+apps/ai/training/outputs/

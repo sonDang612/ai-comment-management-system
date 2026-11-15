@@ -4,6 +4,7 @@ import { Card } from "antd";
 import { CommentDetailModal } from "./comment-detail-modal";
 import { CreateCommentModal } from "./comment-form";
 import { CommentTable } from "./comment-table";
+import { ReviewCommentModal } from "./review-comment-modal";
 
 export function CommentsPage() {
   return (
@@ -13,6 +14,7 @@ export function CommentsPage() {
       </Card>
       <CreateCommentModal />
       <CommentDetailModal />
+      <ReviewCommentModal />
     </>
   );
 }

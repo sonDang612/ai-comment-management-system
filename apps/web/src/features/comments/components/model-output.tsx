@@ -1,7 +1,14 @@
 "use client";
 
-import type { CommentDto, CommentModelOutput, ModelOutputProbability, ModelOutputScore } from "@acms/shared";
-import { Tag } from "antd";
+import type {
+  CommentDto,
+  CommentModelOutput,
+  DecisionSource,
+  ModelOutputProbability,
+  ModelOutputScore,
+} from "@acms/shared";
+import { Tag, Tooltip } from "antd";
+import { UserCheck } from "lucide-react";
 import { useI18n } from "@/i18n";
 
 export const MODEL_VALUE_FRACTION_DIGITS = 4;
@@ -175,7 +182,49 @@ function HeadPrediction({
   );
 }
 
-export function LabelPrediction({ comment }: { comment: CommentDto }) {
+const DECISION_SOURCE_COLORS: Record<DecisionSource, string> = {
+  rule_filter: "purple",
+  ai_model: "blue",
+  admin: "green",
+};
+
+export function DecisionSourceTag({ comment }: { comment: CommentDto }) {
+  const { dict } = useI18n();
+  if (!comment.decided_by) return <NoModelOutput source={checkSource(comment)} />;
+  return (
+    <Tag color={DECISION_SOURCE_COLORS[comment.decided_by]}>
+      {dict.comments.decisionSources[comment.decided_by] ?? comment.decided_by}
+    </Tag>
+  );
+}
+
+function ReviewedPrediction({ head, name, colors }: { head: ModelHeadName; name: string; colors: Record<string, string> }) {
+  const { dict } = useI18n();
+  const t = dict.comments.review;
+  return (
+    <Tooltip title={t.badgeHint}>
+      <span className="inline-flex items-center gap-1">
+        <Tag color={colors[name] ?? "default"} title={name}>
+          {modelClassName(dict.comments.modelClasses, head, name)}
+        </Tag>
+        <span className="inline-flex items-center gap-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+          <UserCheck className="size-3.5" aria-hidden />
+          {t.badge}
+        </span>
+      </span>
+    </Tooltip>
+  );
+}
+
+interface PredictionProps {
+  comment: CommentDto;
+  showReview?: boolean;
+}
+
+export function LabelPrediction({ comment, showReview = true }: PredictionProps) {
+  if (showReview && comment.review) {
+    return <ReviewedPrediction head="label" name={comment.review.label} colors={LABEL_COLORS} />;
+  }
   const source = checkSource(comment);
   if (source === "rule") {
     return (
@@ -191,7 +240,10 @@ export function LabelPrediction({ comment }: { comment: CommentDto }) {
   return <HeadPrediction head="label" best={best} colors={LABEL_COLORS} />;
 }
 
-export function CategoryPrediction({ comment }: { comment: CommentDto }) {
+export function CategoryPrediction({ comment, showReview = true }: PredictionProps) {
+  if (showReview && comment.review) {
+    return <ReviewedPrediction head="category" name={comment.review.category} colors={CATEGORY_COLORS} />;
+  }
   const source = checkSource(comment);
   if (source === "rule") return <RuleBlockedTag />;
   const best = comment.model_output?.category_probabilities[0];

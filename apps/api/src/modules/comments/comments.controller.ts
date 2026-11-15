@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import type { CommentDto, CommentListResponse, CommentStatsResponse } from '@acms/shared';
 import {
   parseCommentListQuery,
@@ -9,6 +9,7 @@ import {
 import { CommentStatsService } from './comment-stats.service.js';
 import { CommentsService } from './comments.service.js';
 import { CreateCommentDto } from './dto/create-comment.dto.js';
+import { ReviewCommentDto } from './dto/review-comment.dto.js';
 
 @Controller('comments')
 export class CommentsController {
@@ -30,5 +31,10 @@ export class CommentsController {
   @Post()
   create(@Body() body: CreateCommentDto): Promise<CommentDto> {
     return this.comments.create(body);
+  }
+
+  @Put(':id/review')
+  review(@Param('id') id: string, @Body() body: ReviewCommentDto): Promise<CommentDto> {
+    return this.comments.review(id, body);
   }
 }

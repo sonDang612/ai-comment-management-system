@@ -3,6 +3,7 @@ import {
   type CommentDto,
   type CommentListResponse,
   type CreateCommentRequest,
+  type ReviewCommentRequest,
 } from "@acms/shared";
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
@@ -46,5 +47,14 @@ export function useCreateComment() {
     mutationFn: (request: CreateCommentRequest) =>
       apiClient.post<CommentDto>(COMMENTS_PATH, request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: commentKeys.lists() }),
+  });
+}
+
+export function useReviewComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...request }: ReviewCommentRequest & { id: string }) =>
+      apiClient.put<CommentDto>(`${COMMENTS_PATH}/${encodeURIComponent(id)}/review`, request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: commentKeys.all }),
   });
 }

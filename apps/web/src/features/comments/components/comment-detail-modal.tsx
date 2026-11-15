@@ -11,6 +11,7 @@ import { ModelHeadCard } from "./model-head-card";
 import {
   CategoryPrediction,
   checkSource,
+  DecisionSourceTag,
   formatPercent,
   isInvalidLabel,
   LabelPrediction,
@@ -53,8 +54,8 @@ function PredictionChip({
 function RulePrediction({ comment }: { comment: CommentDto }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <LabelPrediction comment={comment} />
-      <CategoryPrediction comment={comment} />
+      <LabelPrediction comment={comment} showReview={false} />
+      <CategoryPrediction comment={comment} showReview={false} />
     </div>
   );
 }
@@ -132,7 +133,7 @@ function ModelOutputSection({ output }: { output: CommentModelOutput }) {
 }
 
 function CommentDetail({ comment }: { comment: CommentDto }) {
-  const { dict } = useI18n();
+  const { dict, locale } = useI18n();
   const t = dict.comments;
   return (
     <>
@@ -143,6 +144,20 @@ function CommentDetail({ comment }: { comment: CommentDto }) {
         <SummaryRow label={t.columns.prediction}>
           <Prediction comment={comment} />
         </SummaryRow>
+        <SummaryRow label={t.columns.decidedBy}>
+          <DecisionSourceTag comment={comment} />
+        </SummaryRow>
+        {comment.review && (
+          <SummaryRow label={t.columns.review}>
+            <div className="flex flex-wrap items-center gap-2">
+              <LabelPrediction comment={comment} />
+              <CategoryPrediction comment={comment} />
+              <span className="text-xs text-muted-foreground">
+                {format(t.review.reviewedAt, { time: formatDateTime(comment.review.reviewed_at, locale) })}
+              </span>
+            </div>
+          </SummaryRow>
+        )}
         <SummaryRow label={t.columns.reason}>
           <span className="whitespace-pre-wrap break-all">{comment.reason ?? "-"}</span>
         </SummaryRow>

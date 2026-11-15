@@ -2,7 +2,7 @@
 
 import { COMMENT_PAGE_SIZES, COMMENT_SEARCH_MAX_LENGTH, type CommentDto } from "@acms/shared";
 import { Alert, Button, Input, Skeleton, Table, type TableColumnsType, Typography } from "antd";
-import { Eye, Plus, RotateCw, Search } from "lucide-react";
+import { Eye, PencilLine, Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
 import { apiErrorMessage } from "@/lib/api";
@@ -11,7 +11,7 @@ import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { useTableBodyHeight } from "@/lib/use-table-body-height";
 import { useComments } from "../api";
 import { useCommentsUiStore } from "../store";
-import { CategoryPrediction, LabelPrediction, TopLogit } from "./model-output";
+import { CategoryPrediction, DecisionSourceTag, LabelPrediction, TopLogit } from "./model-output";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const SKELETON_ROW_COUNT = 8;
@@ -43,6 +43,7 @@ export function CommentTable() {
   const setPagination = useCommentsUiStore((state) => state.setPagination);
   const openCreate = useCommentsUiStore((state) => state.openCreate);
   const openDetail = useCommentsUiStore((state) => state.openDetail);
+  const openReview = useCommentsUiStore((state) => state.openReview);
   const search = useCommentsUiStore((state) => state.search);
   const setSearch = useCommentsUiStore((state) => state.setSearch);
   const [searchInput, setSearchInput] = useState(search);
@@ -94,6 +95,12 @@ export function CommentTable() {
       render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryPrediction comment={row} />),
     },
     {
+      key: "decided_by",
+      title: t.columns.decidedBy,
+      width: 110,
+      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <DecisionSourceTag comment={row} />),
+    },
+    {
       key: "created_at",
       title: t.columns.createdAt,
       width: 190,
@@ -102,21 +109,32 @@ export function CommentTable() {
     {
       key: "actions",
       title: t.columns.actions,
-      width: 100,
+      width: 120,
       fixed: "right",
       render: (_, row) =>
         isSkeletonRow(row) ? (
           tagSkeleton
         ) : (
-          <Button
-            type="link"
-            size="small"
-            className="!px-0"
-            icon={<Eye className="size-4" aria-hidden />}
-            onClick={() => openDetail(row)}
-          >
-            {t.details}
-          </Button>
+          <div className="flex flex-col items-start">
+            <Button
+              type="link"
+              size="small"
+              className="!px-0"
+              icon={<Eye className="size-4" aria-hidden />}
+              onClick={() => openDetail(row)}
+            >
+              {t.details}
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              className="!px-0"
+              icon={<PencilLine className="size-4" aria-hidden />}
+              onClick={() => openReview(row)}
+            >
+              {t.review.action}
+            </Button>
+          </div>
         ),
     },
   ];
@@ -176,7 +194,7 @@ export function CommentTable() {
           columns={columns}
           dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
-          scroll={{ x: 1100, y: tableBodyHeight }}
+          scroll={{ x: 1210, y: tableBodyHeight }}
           pagination={{
             current: page,
             pageSize,

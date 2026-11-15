@@ -16,6 +16,29 @@ export const COMMENT_CATEGORIES = [
 ] as const;
 export type CommentCategory = (typeof COMMENT_CATEGORIES)[number];
 
+export const MODERATION_LABELS = ['valid', 'invalid'] as const;
+export type ModerationLabel = (typeof MODERATION_LABELS)[number];
+
+export const VALID_COMMENT_CATEGORIES: readonly CommentCategory[] = ['statement', 'question', 'off_topic'];
+
+export function categoryMatchesLabel(category: CommentCategory, label: ModerationLabel): boolean {
+  return VALID_COMMENT_CATEGORIES.includes(category) === (label === 'valid');
+}
+
+export const DECISION_SOURCES = ['rule_filter', 'ai_model', 'admin'] as const;
+export type DecisionSource = (typeof DECISION_SOURCES)[number];
+
+export interface CommentReview {
+  label: ModerationLabel;
+  category: CommentCategory;
+  reviewed_at: string;
+}
+
+export interface ReviewCommentRequest {
+  label: ModerationLabel;
+  category: CommentCategory;
+}
+
 export interface CreateCommentRequest {
   content: string;
 }
@@ -42,6 +65,8 @@ export interface CommentDto {
   category: CommentCategory | null;
   reason: string | null;
   model_output: CommentModelOutput | null;
+  decided_by: DecisionSource | null;
+  review: CommentReview | null;
   moderated_at: string | null;
   created_at: string;
   updated_at: string;

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AiCommentAnalysis, ModelOutputScore } from '@acms/shared';
+import type { AiCommentAnalysis, DecisionSource, ModelOutputScore } from '@acms/shared';
 import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import { type Comment, Prisma } from '../../generated/prisma/client.js';
@@ -49,7 +49,7 @@ export class ModerationService {
       return comment;
     }
 
-    if (violations.length > 0) return this.saveResult(comment, ruleViolationResult(violations), null);
+    if (violations.length > 0) return this.saveResult(comment, ruleViolationResult(violations), null, 'rule_filter');
 
     try {
       const { analysis, scores } = await this.analyzer.analyze({ comment_id: comment.id, content: comment.content });
@@ -59,7 +59,7 @@ export class ModerationService {
         );
         return this.saveScores(comment, scores);
       }
-      return this.saveResult(comment, analysis, scores);
+      return this.saveResult(comment, analysis, scores, 'ai_model');
     } catch (error) {
       this.logger.warn(`Analysis failed for comment ${comment.id}, it stays unchecked: ${errorMessage(error)}`);
       return comment;
@@ -79,13 +79,19 @@ export class ModerationService {
     return this.prisma.comment.update({ where: { id: comment.id }, data: { aiScores: this.toScoresColumn(scores) } });
   }
 
-  private saveResult(comment: Comment, result: AiCommentAnalysis, scores: ModelOutputScore[] | null): Promise<Comment> {
+  private saveResult(
+    comment: Comment,
+    result: AiCommentAnalysis,
+    scores: ModelOutputScore[] | null,
+    decidedBy: DecisionSource,
+  ): Promise<Comment> {
     return this.prisma.comment.update({
       where: { id: comment.id },
       data: {
         category: result.category,
         reason: result.reason,
         aiScores: this.toScoresColumn(scores),
+        decidedBy,
         moderatedAt: new Date(),
       },
     });

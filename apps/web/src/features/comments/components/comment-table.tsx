@@ -10,7 +10,7 @@ import {
 import { Alert, Button, DatePicker, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
 import type { SortOrder } from "antd/es/table/interface";
 import dayjs, { type Dayjs } from "dayjs";
-import { Eye, PencilLine, Plus, RotateCw, Search } from "lucide-react";
+import { Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
 import { apiErrorMessage } from "@/lib/api";
@@ -117,13 +117,13 @@ export function CommentTable() {
     {
       key: "category",
       title: t.columns.category,
-      width: 210,
+      width: 170,
       render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryPrediction comment={row} />),
     },
     {
       key: "decided_by",
-      title: t.columns.decidedBy,
-      width: 110,
+      title: <span className="whitespace-nowrap">{t.columns.decidedBy}</span>,
+      width: 150,
       render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <DecisionSourceTag comment={row} />),
     },
     {
@@ -138,18 +138,17 @@ export function CommentTable() {
     {
       key: "actions",
       title: t.columns.actions,
-      width: 120,
+      width: 140,
       fixed: "right",
       render: (_, row) =>
         isSkeletonRow(row) ? (
           tagSkeleton
         ) : (
-          <div className="flex flex-col items-start">
+          <div className="flex items-center gap-3 whitespace-nowrap">
             <Button
               type="link"
               size="small"
               className="!px-0"
-              icon={<Eye className="size-4" aria-hidden />}
               onClick={() => openDetail(row)}
             >
               {t.details}
@@ -158,7 +157,6 @@ export function CommentTable() {
               type="link"
               size="small"
               className="!px-0"
-              icon={<PencilLine className="size-4" aria-hidden />}
               onClick={() => openReview(row)}
             >
               {t.review.action}
@@ -240,7 +238,7 @@ export function CommentTable() {
           columns={columns}
           dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
-          scroll={{ x: 1120, y: tableBodyHeight }}
+          scroll={{ x: 1140, y: tableBodyHeight }}
           onChange={(_, __, sorter, extra) => {
             if (extra.action !== "sort" || Array.isArray(sorter)) return;
             setOrder(sorter.order === "ascend" ? "asc" : "desc");

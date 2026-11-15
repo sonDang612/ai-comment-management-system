@@ -64,6 +64,8 @@ export function CommentTable() {
     {
       key: "content",
       title: t.columns.content,
+      width: 320,
+      fixed: "left",
       render: (_, row) =>
         isSkeletonRow(row) ? (
           textSkeleton
@@ -194,7 +196,7 @@ export function CommentTable() {
           columns={columns}
           dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
-          scroll={{ x: 1210, y: tableBodyHeight }}
+          scroll={{ x: 1350, y: tableBodyHeight }}
           pagination={{
             current: page,
             pageSize,

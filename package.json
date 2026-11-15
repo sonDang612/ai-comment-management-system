@@ -12,7 +12,8 @@
     "env:init": "node scripts/env-init.mjs",
     "docker": "node scripts/docker.mjs",
     "docker:up": "node scripts/docker.mjs development up -d --build",
-    "docker:down": "node scripts/docker.mjs development down"
+    "docker:down": "node scripts/docker.mjs development down",
+    "docker:ai": "docker run --rm -p 8080:8080 -v \"$PWD/apps/ai/training/outputs/chinese-roberta-v1/model:/model:ro\" ghcr.io/huggingface/text-embeddings-inference:cpu-1.8 --model-id /model --port 8080 --auto-truncate"
   },
   "engines": {
     "node": ">=22.18"

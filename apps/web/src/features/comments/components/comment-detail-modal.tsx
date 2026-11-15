@@ -1,7 +1,16 @@
 "use client";
 
 import type { CommentModelOutput, ModelOutputScore } from "@acms/shared";
-import { Descriptions, type DescriptionsProps, Modal, Table, type TableColumnsType, Typography } from "antd";
+import {
+  Descriptions,
+  type DescriptionsProps,
+  Modal,
+  Table,
+  type TableColumnsType,
+  Tabs,
+  type TabsProps,
+  Typography,
+} from "antd";
 import { useI18n } from "@/i18n";
 import { formatDateTime } from "@/lib/datetime";
 import { useCommentsUiStore } from "../store";
@@ -37,30 +46,38 @@ function RawScores({ output }: { output: CommentModelOutput }) {
     },
   ];
 
-  return (
-    <div className="flex flex-col gap-3">
-      <Typography.Title level={5} className="!mb-0">
-        {t.rawOutput}
-      </Typography.Title>
-      <Table<ModelOutputScore>
-        rowKey="label"
-        size="small"
-        bordered
-        pagination={false}
-        columns={columns}
-        dataSource={output.scores}
-      />
-      <Typography.Text type="secondary">{t.rawJson}</Typography.Text>
-      <Typography.Paragraph
-        copyable={{ text: JSON.stringify(output.scores) }}
-        className="!mb-0 max-h-64 overflow-auto rounded bg-black/5 p-3 dark:bg-white/10"
-      >
-        <pre className="!m-0 !bg-transparent !p-0 font-mono text-xs">
-          {JSON.stringify(output.scores, null, JSON_INDENT)}
-        </pre>
-      </Typography.Paragraph>
-    </div>
-  );
+  const tabs: TabsProps["items"] = [
+    {
+      key: "scores",
+      label: t.rawOutput,
+      children: (
+        <Table<ModelOutputScore>
+          rowKey="label"
+          size="small"
+          bordered
+          pagination={false}
+          columns={columns}
+          dataSource={output.scores}
+        />
+      ),
+    },
+    {
+      key: "json",
+      label: t.rawJson,
+      children: (
+        <Typography.Paragraph
+          copyable={{ text: JSON.stringify(output.scores) }}
+          className="!mb-0 flex items-start justify-between gap-2 rounded bg-black/5 p-3 dark:bg-white/10"
+        >
+          <pre className="!m-0 !bg-transparent !p-0 font-mono text-xs">
+            {JSON.stringify(output.scores, null, JSON_INDENT)}
+          </pre>
+        </Typography.Paragraph>
+      ),
+    },
+  ];
+
+  return <Tabs size="small" items={tabs} />;
 }
 
 export function CommentDetailModal() {
@@ -125,6 +142,7 @@ export function CommentDetailModal() {
       onCancel={closeDetail}
       footer={null}
       width={760}
+      classNames={{ container: "!flex max-h-[80vh] flex-col", body: "min-h-0 flex-1 overflow-y-auto" }}
       destroyOnHidden
     >
       <div className="flex flex-col gap-4 pt-2">

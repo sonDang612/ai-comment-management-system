@@ -42,14 +42,14 @@ export class CommentsService {
     return toCommentDto(reviewed);
   }
 
-  async list({ page, pageSize, search }: CommentListParams): Promise<CommentListResponse> {
+  async list({ page, pageSize, search, order }: CommentListParams): Promise<CommentListResponse> {
     const where: Prisma.CommentWhereInput =
       search === undefined ? {} : { content: { contains: search, mode: 'insensitive' } };
     const [total, comments] = await this.prisma.$transaction([
       this.prisma.comment.count({ where }),
       this.prisma.comment.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy: [{ createdAt: order }, { id: order }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

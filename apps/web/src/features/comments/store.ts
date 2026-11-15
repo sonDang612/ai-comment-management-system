@@ -1,4 +1,4 @@
-import { type CommentDto, DEFAULT_COMMENT_PAGE_SIZE } from "@acms/shared";
+import { type CommentDto, type CommentSortOrder, DEFAULT_COMMENT_PAGE_SIZE, DEFAULT_COMMENT_SORT_ORDER } from "@acms/shared";
 import { create } from "zustand";
 
 interface CommentsUiState {
@@ -7,6 +7,7 @@ interface CommentsUiState {
   page: number;
   pageSize: number;
   search: string;
+  order: CommentSortOrder;
   detailComment: CommentDto | null;
   reviewComment: CommentDto | null;
   setDraft: (draft: string) => void;
@@ -15,6 +16,7 @@ interface CommentsUiState {
   closeCreate: () => void;
   setPagination: (page: number, pageSize: number) => void;
   setSearch: (search: string) => void;
+  setOrder: (order: CommentSortOrder) => void;
   showFirstPage: () => void;
   openDetail: (comment: CommentDto) => void;
   closeDetail: () => void;
@@ -28,6 +30,7 @@ export const useCommentsUiStore = create<CommentsUiState>()((set) => ({
   page: 1,
   pageSize: DEFAULT_COMMENT_PAGE_SIZE,
   search: "",
+  order: DEFAULT_COMMENT_SORT_ORDER,
   detailComment: null,
   reviewComment: null,
   setDraft: (draft) => set({ draft }),
@@ -37,6 +40,7 @@ export const useCommentsUiStore = create<CommentsUiState>()((set) => ({
   setPagination: (page, pageSize) =>
     set((state) => ({ page: pageSize === state.pageSize ? page : 1, pageSize })),
   setSearch: (search) => set((state) => (state.search === search ? {} : { search, page: 1 })),
+  setOrder: (order) => set((state) => (state.order === order ? {} : { order, page: 1 })),
   showFirstPage: () => set({ page: 1 }),
   openDetail: (detailComment) => set({ detailComment }),
   closeDetail: () => set({ detailComment: null }),

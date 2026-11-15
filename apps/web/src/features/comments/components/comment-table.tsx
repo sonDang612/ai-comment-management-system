@@ -2,6 +2,7 @@
 
 import { COMMENT_PAGE_SIZES, COMMENT_SEARCH_MAX_LENGTH, type CommentDto } from "@acms/shared";
 import { Alert, Button, Input, Skeleton, Table, type TableColumnsType, Typography } from "antd";
+import type { SortOrder } from "antd/es/table/interface";
 import { Eye, PencilLine, Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
@@ -11,10 +12,11 @@ import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { useTableBodyHeight } from "@/lib/use-table-body-height";
 import { useComments } from "../api";
 import { useCommentsUiStore } from "../store";
-import { CategoryPrediction, DecisionSourceTag, LabelPrediction, TopLogit } from "./model-output";
+import { CategoryPrediction, DecisionSourceTag, LabelPrediction } from "./model-output";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const SKELETON_ROW_COUNT = 8;
+const SORT_DIRECTIONS: SortOrder[] = ["descend", "ascend", "descend"];
 
 interface SkeletonRow {
   id: string;
@@ -46,12 +48,15 @@ export function CommentTable() {
   const openReview = useCommentsUiStore((state) => state.openReview);
   const search = useCommentsUiStore((state) => state.search);
   const setSearch = useCommentsUiStore((state) => state.setSearch);
+  const order = useCommentsUiStore((state) => state.order);
+  const setOrder = useCommentsUiStore((state) => state.setOrder);
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), SEARCH_DEBOUNCE_MS);
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useComments({
     page,
     pageSize,
     search: search || undefined,
+    order,
   });
   const isLoadingRows = isPending || isPlaceholderData;
   const tableWrapperRef = useRef<HTMLDivElement>(null);
@@ -79,12 +84,6 @@ export function CommentTable() {
         ),
     },
     {
-      key: "top_logit",
-      title: t.columns.topLogit,
-      width: 230,
-      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : <TopLogit comment={row} />),
-    },
-    {
       key: "label",
       title: t.columns.label,
       width: 170,
@@ -106,6 +105,9 @@ export function CommentTable() {
       key: "created_at",
       title: t.columns.createdAt,
       width: 190,
+      sorter: true,
+      sortOrder: order === "asc" ? "ascend" : "descend",
+      sortDirections: SORT_DIRECTIONS,
       render: (_, row) => (isSkeletonRow(row) ? textSkeleton : formatDateTime(row.created_at, locale)),
     },
     {
@@ -196,7 +198,11 @@ export function CommentTable() {
           columns={columns}
           dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
-          scroll={{ x: 1350, y: tableBodyHeight }}
+          scroll={{ x: 1120, y: tableBodyHeight }}
+          onChange={(_, __, sorter, extra) => {
+            if (extra.action !== "sort" || Array.isArray(sorter)) return;
+            setOrder(sorter.order === "ascend" ? "asc" : "desc");
+          }}
           pagination={{
             current: page,
             pageSize,

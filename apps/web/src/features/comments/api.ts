@@ -3,6 +3,7 @@ import {
   type CommentDto,
   type CommentListResponse,
   type CommentSortOrder,
+  type DecisionSource,
   type CreateCommentRequest,
   type ReviewCommentRequest,
 } from "@acms/shared";
@@ -16,6 +17,7 @@ export interface CommentListParams {
   pageSize: number;
   search?: string;
   order: CommentSortOrder;
+  decidedBy?: DecisionSource;
 }
 
 export const commentKeys = {
@@ -34,6 +36,7 @@ export function commentListQueryOptions(params: CommentListParams) {
           page_size: params.pageSize,
           q: params.search,
           order: params.order,
+          decided_by: params.decidedBy,
         },
       }),
     placeholderData: keepPreviousData,

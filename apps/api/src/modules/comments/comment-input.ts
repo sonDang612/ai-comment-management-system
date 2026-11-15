@@ -1,6 +1,8 @@
 import {
   COMMENT_SEARCH_MAX_LENGTH,
   COMMENT_SORT_ORDERS,
+  DECISION_SOURCES,
+  type DecisionSource,
   type CommentSortOrder,
   DEFAULT_COMMENT_SORT_ORDER,
   DEFAULT_COMMENT_PAGE_SIZE,
@@ -15,6 +17,7 @@ export interface CommentListParams {
   pageSize: number;
   search: string | undefined;
   order: CommentSortOrder;
+  decidedBy: DecisionSource | undefined;
 }
 
 export interface RawCommentListQuery {
@@ -22,6 +25,7 @@ export interface RawCommentListQuery {
   page_size?: string;
   q?: string;
   order?: string;
+  decided_by?: string;
 }
 
 function parsePositiveInt(field: string, raw: string | undefined, fallback: number, max?: number): number {
@@ -58,6 +62,17 @@ function parseSortOrder(raw: string | undefined): CommentSortOrder {
   return order;
 }
 
+function parseDecisionSource(raw: string | undefined): DecisionSource | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  const source = DECISION_SOURCES.find((item) => item === raw);
+  if (source === undefined) {
+    throw new ValidationException(`decided_by must be one of ${DECISION_SOURCES.join(', ')}`, [
+      { field: 'decided_by', rule: 'one_of', allowed: [...DECISION_SOURCES] },
+    ]);
+  }
+  return source;
+}
+
 export interface RawCommentStatsQuery {
   days?: string;
 }
@@ -72,5 +87,6 @@ export function parseCommentListQuery(query: RawCommentListQuery): CommentListPa
     pageSize: parsePositiveInt('page_size', query.page_size, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE),
     search: parseSearch(query.q),
     order: parseSortOrder(query.order),
+    decidedBy: parseDecisionSource(query.decided_by),
   };
 }

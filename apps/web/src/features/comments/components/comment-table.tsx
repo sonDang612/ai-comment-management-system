@@ -1,7 +1,13 @@
 "use client";
 
-import { COMMENT_PAGE_SIZES, COMMENT_SEARCH_MAX_LENGTH, type CommentDto } from "@acms/shared";
-import { Alert, Button, Input, Skeleton, Table, type TableColumnsType, Typography } from "antd";
+import {
+  COMMENT_PAGE_SIZES,
+  COMMENT_SEARCH_MAX_LENGTH,
+  type CommentDto,
+  DECISION_SOURCES,
+  type DecisionSource,
+} from "@acms/shared";
+import { Alert, Button, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
 import type { SortOrder } from "antd/es/table/interface";
 import { Eye, PencilLine, Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
@@ -50,6 +56,8 @@ export function CommentTable() {
   const setSearch = useCommentsUiStore((state) => state.setSearch);
   const order = useCommentsUiStore((state) => state.order);
   const setOrder = useCommentsUiStore((state) => state.setOrder);
+  const decidedBy = useCommentsUiStore((state) => state.decidedBy);
+  const setDecidedBy = useCommentsUiStore((state) => state.setDecidedBy);
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), SEARCH_DEBOUNCE_MS);
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useComments({
@@ -57,6 +65,7 @@ export function CommentTable() {
     pageSize,
     search: search || undefined,
     order,
+    decidedBy: decidedBy ?? undefined,
   });
   const isLoadingRows = isPending || isPlaceholderData;
   const tableWrapperRef = useRef<HTMLDivElement>(null);
@@ -162,6 +171,15 @@ export function CommentTable() {
             aria-label={t.searchLabel}
             maxLength={COMMENT_SEARCH_MAX_LENGTH}
             className="!w-64"
+          />
+          <Select<DecisionSource>
+            allowClear
+            value={decidedBy ?? undefined}
+            onChange={(value) => setDecidedBy(value ?? null)}
+            placeholder={t.decidedByPlaceholder}
+            aria-label={t.columns.decidedBy}
+            options={DECISION_SOURCES.map((source) => ({ value: source, label: t.decisionSources[source] ?? source }))}
+            className="!w-48"
           />
         </div>
         <div className="flex items-center gap-2">

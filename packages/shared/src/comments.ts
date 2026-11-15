@@ -85,6 +85,7 @@ export interface CommentListQuery {
   page_size?: number;
   q?: string;
   order?: CommentSortOrder;
+  decided_by?: DecisionSource;
 }
 
 export interface CommentListResponse {

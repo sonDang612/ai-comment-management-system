@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { SmallScreenNotice } from "@/components/small-screen-notice";
 import { APPLY_COLOR_SCHEME_SCRIPT } from "@/config/theme";
 import { I18nProvider, LOCALES } from "@/i18n";
 import { getDictionary, getLocale } from "@/i18n/server";
@@ -49,11 +50,14 @@ export default async function RootLayout({ children }: LayoutProps<"/[lang]">) {
       </head>
       <body className="flex min-h-full flex-col">
         <I18nProvider locale={locale} dict={dict}>
-          <Suspense fallback={null}>
-            <AppProviders>
-              <DashboardShell>{children}</DashboardShell>
-            </AppProviders>
-          </Suspense>
+          <SmallScreenNotice />
+          <div className="app-screen min-h-full flex-1 flex-col">
+            <Suspense fallback={null}>
+              <AppProviders>
+                <DashboardShell>{children}</DashboardShell>
+              </AppProviders>
+            </Suspense>
+          </div>
         </I18nProvider>
       </body>
     </html>

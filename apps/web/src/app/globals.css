@@ -152,6 +152,24 @@
   }
 }
 
+.small-screen-notice {
+  display: none;
+}
+
+.app-screen {
+  display: flex;
+}
+
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) {
+  .small-screen-notice {
+    display: flex;
+  }
+
+  .app-screen {
+    display: none;
+  }
+}
+
 @view-transition {
   navigation: auto;
 }

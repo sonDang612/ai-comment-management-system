@@ -38,6 +38,10 @@ const zhCN = {
     description: "您访问的页面不存在或已被移除，请检查链接是否正确。",
     goBack: "返回上一页",
   },
+  smallScreen: {
+    title: "暂不支持小屏幕",
+    description: "本系统需要较大的屏幕才能正常使用，请在电脑或平板上打开。",
+  },
   dashboard: {
     title: "数据概览",
     loadFailed: "统计数据加载失败：{message}",

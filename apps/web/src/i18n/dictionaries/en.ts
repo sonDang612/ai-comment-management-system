@@ -35,6 +35,10 @@ const en: Dictionary = {
     description: "The page you are looking for does not exist or has been removed. Check the link and try again.",
     goBack: "Go back",
   },
+  smallScreen: {
+    title: "Small screens are not supported",
+    description: "This system needs a larger screen. Open it on a computer or a tablet.",
+  },
   dashboard: {
     title: "Dashboard",
     loadFailed: "Failed to load statistics: {message}",

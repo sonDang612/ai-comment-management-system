@@ -1,158 +1,169 @@
 "use client";
 
-import type { CommentModelOutput, ModelOutputScore } from "@acms/shared";
-import {
-  Descriptions,
-  type DescriptionsProps,
-  Modal,
-  Table,
-  type TableColumnsType,
-  Tabs,
-  type TabsProps,
-  Typography,
-} from "antd";
-import { useI18n } from "@/i18n";
+import type { CommentDto, CommentModelOutput } from "@acms/shared";
+import { Modal, Tabs, type TabsProps, Typography } from "antd";
+import { TriangleAlert } from "lucide-react";
+import type { ReactNode } from "react";
+import { format, useI18n } from "@/i18n";
 import { formatDateTime } from "@/lib/datetime";
 import { useCommentsUiStore } from "../store";
-import { CategoryPrediction, formatModelValue, headProbability, LabelPrediction, TopLogit } from "./model-output";
+import { ModelHeadCard } from "./model-head-card";
+import { formatPercent, isInvalidLabel, labelCategoryDisagree, modelHeads } from "./model-output";
 
 const JSON_INDENT = 2;
+const SECONDS_FRACTION_DIGITS = 2;
+const MILLISECONDS_PER_SECOND = 1000;
 
-function RawScores({ output }: { output: CommentModelOutput }) {
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid sm:grid-cols-[160px_1fr]">
+      <dt className="px-4 py-3 text-muted-foreground sm:bg-muted/40">{label}</dt>
+      <dd className="!m-0 min-w-0 px-4 py-3">{children}</dd>
+    </div>
+  );
+}
+
+function PredictionChip({ name, probability, tone }: { name: string; probability: number; tone: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[12.5px] ${tone}`}>
+      <b className="font-semibold">{name}</b>
+      <span className="opacity-70">{formatPercent(probability)}</span>
+    </span>
+  );
+}
+
+function Prediction({ output }: { output: CommentModelOutput | null }) {
   const { dict } = useI18n();
-  const t = dict.comments;
-  const columns: TableColumnsType<ModelOutputScore> = [
-    {
-      key: "label",
-      title: t.columns.outputLabel,
-      render: (_, score) => <code className="text-xs">{score.label}</code>,
-    },
-    {
-      key: "score",
-      title: t.columns.logit,
-      width: 120,
-      align: "right",
-      render: (_, score) => <span className="font-mono">{formatModelValue(score.score)}</span>,
-    },
-    {
-      key: "probability",
-      title: t.columns.headProbability,
-      width: 170,
-      align: "right",
-      render: (_, score) => {
-        const probability = headProbability(output, score.label);
-        return <span className="font-mono">{probability === null ? "-" : formatModelValue(probability)}</span>;
-      },
-    },
-  ];
-
-  const tabs: TabsProps["items"] = [
-    {
-      key: "scores",
-      label: t.rawOutput,
-      children: (
-        <Table<ModelOutputScore>
-          rowKey="label"
-          size="small"
-          bordered
-          pagination={false}
-          columns={columns}
-          dataSource={output.scores}
+  const label = output?.label_probabilities[0];
+  const category = output?.category_probabilities[0];
+  if (!output || (!label && !category)) return "-";
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {label && (
+        <PredictionChip
+          name={label.name}
+          probability={label.probability}
+          tone={
+            isInvalidLabel(label.name)
+              ? "bg-red-500/10 text-red-600 dark:text-red-400"
+              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          }
         />
+      )}
+      {label && category && <span className="text-muted-foreground">·</span>}
+      {category && (
+        <PredictionChip name={category.name} probability={category.probability} tone="bg-muted text-foreground" />
+      )}
+      {labelCategoryDisagree(output) && (
+        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+          <TriangleAlert className="size-3.5" aria-hidden />
+          {dict.comments.modelOutput.disagree}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CheckedAt({ comment }: { comment: CommentDto }) {
+  const { dict, locale } = useI18n();
+  if (!comment.moderated_at) return dict.comments.unchecked;
+  const seconds =
+    (new Date(comment.moderated_at).getTime() - new Date(comment.created_at).getTime()) / MILLISECONDS_PER_SECOND;
+  return (
+    <>
+      {formatDateTime(comment.moderated_at, locale)}
+      <span className="ml-1 text-[12.5px] text-muted-foreground">
+        {format(dict.comments.afterSubmit, { seconds: seconds.toFixed(SECONDS_FRACTION_DIGITS) })}
+      </span>
+    </>
+  );
+}
+
+function ModelOutputTabs({ output }: { output: CommentModelOutput }) {
+  const { dict } = useI18n();
+  const t = dict.comments.modelOutput;
+  const items: TabsProps["items"] = [
+    {
+      key: "model",
+      label: t.tab,
+      children: (
+        <div className="grid gap-3">
+          {modelHeads(output).map((head) => (
+            <ModelHeadCard key={head.head} head={head} />
+          ))}
+        </div>
       ),
     },
     {
-      key: "json",
+      key: "raw",
       label: t.rawJson,
       children: (
-        <Typography.Paragraph
-          copyable={{ text: JSON.stringify(output.scores) }}
-          className="!mb-0 flex items-start justify-between gap-2 rounded bg-black/5 p-3 dark:bg-white/10"
-        >
-          <pre className="!m-0 !bg-transparent !p-0 font-mono text-xs">
+        <div className="relative">
+          <Typography.Text
+            copyable={{ text: JSON.stringify(output.scores) }}
+            className="!absolute right-3 top-3"
+          />
+          <pre className="!m-0 max-h-96 overflow-auto rounded-lg border border-border bg-muted/40 p-4 font-mono text-[12.5px] leading-relaxed">
             {JSON.stringify(output.scores, null, JSON_INDENT)}
           </pre>
-        </Typography.Paragraph>
+        </div>
       ),
     },
   ];
+  return <Tabs items={items} className="!mt-6" />;
+}
 
-  return <Tabs size="small" items={tabs} />;
+function CommentDetail({ comment }: { comment: CommentDto }) {
+  const { dict } = useI18n();
+  const t = dict.comments;
+  return (
+    <>
+      <dl className="!m-0 divide-y divide-border overflow-hidden rounded-lg border border-border">
+        <SummaryRow label={t.columns.content}>
+          <span className="whitespace-pre-wrap break-all text-[15px]">{comment.content || "-"}</span>
+        </SummaryRow>
+        <SummaryRow label={t.columns.prediction}>
+          <Prediction output={comment.model_output} />
+        </SummaryRow>
+        <SummaryRow label={t.columns.reason}>
+          <span className="whitespace-pre-wrap break-all">{comment.reason ?? "-"}</span>
+        </SummaryRow>
+        <SummaryRow label={t.columns.checkedAt}>
+          <CheckedAt comment={comment} />
+        </SummaryRow>
+        <SummaryRow label={t.columns.id}>
+          <Typography.Text copyable className="font-mono text-[13px]">
+            {comment.id}
+          </Typography.Text>
+        </SummaryRow>
+      </dl>
+      {comment.model_output ? (
+        <ModelOutputTabs output={comment.model_output} />
+      ) : (
+        <Typography.Paragraph type="secondary" className="!mb-0 !mt-6">
+          {t.modelNotCalled}
+        </Typography.Paragraph>
+      )}
+    </>
+  );
 }
 
 export function CommentDetailModal() {
-  const { dict, locale } = useI18n();
-  const t = dict.comments;
+  const { dict } = useI18n();
   const comment = useCommentsUiStore((state) => state.detailComment);
   const closeDetail = useCommentsUiStore((state) => state.closeDetail);
 
-  const items: DescriptionsProps["items"] = comment
-    ? [
-        {
-          key: "content",
-          label: t.columns.content,
-          children: (
-            <Typography.Paragraph className="!mb-0 whitespace-pre-wrap break-all">
-              {comment.content || "-"}
-            </Typography.Paragraph>
-          ),
-        },
-        {
-          key: "top_logit",
-          label: t.columns.topLogit,
-          children: <TopLogit output={comment.model_output} />,
-        },
-        {
-          key: "label_softmax",
-          label: t.columns.labelSoftmax,
-          children: <LabelPrediction output={comment.model_output} />,
-        },
-        {
-          key: "category_softmax",
-          label: t.columns.categorySoftmax,
-          children: <CategoryPrediction output={comment.model_output} />,
-        },
-        {
-          key: "reason",
-          label: t.columns.reason,
-          children: <span className="whitespace-pre-wrap break-all">{comment.reason ?? "-"}</span>,
-        },
-        {
-          key: "created_at",
-          label: t.columns.createdAt,
-          children: formatDateTime(comment.created_at, locale),
-        },
-        {
-          key: "moderated_at",
-          label: t.columns.checkedAt,
-          children: comment.moderated_at ? formatDateTime(comment.moderated_at, locale) : "-",
-        },
-        {
-          key: "id",
-          label: t.columns.id,
-          children: <Typography.Text copyable className="font-mono text-xs">{comment.id}</Typography.Text>,
-        },
-      ]
-    : [];
-
   return (
     <Modal
-      title={t.detailTitle}
+      title={dict.comments.detailTitle}
       open={comment !== null}
       onCancel={closeDetail}
       footer={null}
-      width={760}
-      classNames={{ container: "!flex max-h-[80vh] flex-col", body: "min-h-0 flex-1 overflow-y-auto" }}
+      width={768}
+      classNames={{ container: "!flex max-h-[80vh] flex-col", body: "min-h-0 flex-1 overflow-y-auto pt-3" }}
       destroyOnHidden
     >
-      <div className="flex flex-col gap-4 pt-2">
-        <Descriptions column={1} bordered size="small" items={items} />
-        {comment?.model_output ? (
-          <RawScores output={comment.model_output} />
-        ) : (
-          <Typography.Text type="secondary">{t.modelNotCalled}</Typography.Text>
-        )}
-      </div>
+      {comment && <CommentDetail comment={comment} />}
     </Modal>
   );
 }

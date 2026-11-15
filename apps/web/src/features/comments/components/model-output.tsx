@@ -5,8 +5,12 @@ import { Tag } from "antd";
 
 export const MODEL_VALUE_FRACTION_DIGITS = 4;
 
-const LABEL_HEAD_PREFIX = "label:";
-const CATEGORY_HEAD_PREFIX = "category:";
+const PERCENT_FRACTION_DIGITS = 2;
+const PERCENT_CEILING = 0.9999;
+const PERCENT_FLOOR = 0.0001;
+const HEAD_SEPARATOR = ":";
+const INVALID_LABEL = "invalid";
+const VALID_CATEGORIES: ReadonlySet<string> = new Set(["statement", "question", "off_topic"]);
 
 const LABEL_COLORS: Record<string, string> = {
   valid: "success",
@@ -29,21 +33,65 @@ const CATEGORY_COLORS: Record<string, string> = {
   political: "error",
 };
 
+export type ModelHeadName = "label" | "category";
+
+export interface ModelHeadClass {
+  name: string;
+  probability: number;
+  logit: number;
+}
+
+export interface ModelHead {
+  head: ModelHeadName;
+  classes: ModelHeadClass[];
+  margin: number | null;
+}
+
 export function formatModelValue(value: number): string {
   return value.toFixed(MODEL_VALUE_FRACTION_DIGITS);
+}
+
+export function formatPercent(probability: number): string {
+  if (probability >= PERCENT_CEILING) return ">99.99%";
+  if (probability < PERCENT_FLOOR) return "<0.01%";
+  return `${(probability * 100).toFixed(PERCENT_FRACTION_DIGITS)}%`;
 }
 
 export function topScore(output: CommentModelOutput | null): ModelOutputScore | null {
   return output?.scores[0] ?? null;
 }
 
-export function headProbability(output: CommentModelOutput, outputLabel: string): number | null {
-  const [probabilities, name] = outputLabel.startsWith(CATEGORY_HEAD_PREFIX)
-    ? [output.category_probabilities, outputLabel.slice(CATEGORY_HEAD_PREFIX.length)]
-    : outputLabel.startsWith(LABEL_HEAD_PREFIX)
-      ? [output.label_probabilities, outputLabel.slice(LABEL_HEAD_PREFIX.length)]
-      : [output.label_probabilities, outputLabel];
-  return probabilities.find((probability) => probability.name === name)?.probability ?? null;
+function logitOf(output: CommentModelOutput, head: ModelHeadName, name: string): number {
+  const qualified = `${head}${HEAD_SEPARATOR}${name}`;
+  const score = output.scores.find((item) => item.label === qualified) ?? output.scores.find((item) => item.label === name);
+  return score?.score ?? Number.NaN;
+}
+
+function toHead(output: CommentModelOutput, head: ModelHeadName, probabilities: ModelOutputProbability[]): ModelHead {
+  const classes = probabilities.map((item) => ({ ...item, logit: logitOf(output, head, item.name) }));
+  const [first, second] = classes;
+  return { head, classes, margin: first && second ? first.logit - second.logit : null };
+}
+
+export function modelHeads(output: CommentModelOutput): ModelHead[] {
+  const heads: [ModelHeadName, ModelOutputProbability[]][] = [
+    ["label", output.label_probabilities],
+    ["category", output.category_probabilities],
+  ];
+  return heads
+    .filter(([, probabilities]) => probabilities.length > 0)
+    .map(([head, probabilities]) => toHead(output, head, probabilities));
+}
+
+export function isInvalidLabel(name: string): boolean {
+  return name === INVALID_LABEL;
+}
+
+export function labelCategoryDisagree(output: CommentModelOutput): boolean {
+  const label = output.label_probabilities[0]?.name;
+  const category = output.category_probabilities[0]?.name;
+  if (label === undefined || category === undefined) return false;
+  return VALID_CATEGORIES.has(category) === isInvalidLabel(label);
 }
 
 export function TopLogit({ output }: { output: CommentModelOutput | null }) {

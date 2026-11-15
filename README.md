@@ -163,10 +163,11 @@ pnpm db:status
   with two independent heads on a shared encoder, stored as one classification layer whose outputs are
   `label:valid`, `label:invalid` and `category:<name>` (`statement`, `question`, `off_topic`, `toxic`, `sexual`,
   `spam`, `gibberish`, `advertisement`, `scam`, `privacy`, `illegal`, `political`). The API checks that exactly these
-  outputs come back with finite logits and applies a softmax per head. `is_valid` comes from the label head,
-  `category` from the category head, `is_question` is `is_valid && category == "question"`, the confidence is the
-  label head probability, and the reason is a fixed Simplified Chinese text per category
-  (`modules/moderation/analysis/moderation-labels.ts`). A legacy 3-class model (`valid` / `question` / `invalid`)
+  outputs come back with finite logits and applies a softmax per head. The label head decides valid / invalid and
+  its probability is the confidence checked against `AI_CONFIDENCE_THRESHOLD` (questions always pass); `category`
+  comes from the category head and the reason is a fixed Simplified Chinese text per category
+  (`modules/moderation/analysis/moderation-labels.ts`). The raw TEI scores are stored in `comments.ai_scores`
+  (even below the threshold) and returned as `model_output` with the per-head probabilities. A legacy 3-class model (`valid` / `question` / `invalid`)
   is still accepted; its `category` is `question` or `null`. Rule violations store `category: null`. There is no
   prompt, so the comment cannot carry instructions.
 - `stub`: marks every comment that passes the rules as valid. Allowed only when `APP_ENV` is `local`, `test` or

@@ -4,18 +4,14 @@ import { ValidationException } from '../../common/errors/app.exception.js';
 export interface CommentListParams {
   page: number;
   pageSize: number;
-  isValid: boolean | undefined;
   search: string | undefined;
 }
 
 export interface RawCommentListQuery {
   page?: string;
   page_size?: string;
-  is_valid?: string;
   q?: string;
 }
-
-const BOOLEAN_VALUES: Record<string, boolean> = { true: true, false: false };
 
 function parsePositiveInt(field: string, raw: string | undefined, fallback: number, max?: number): number {
   if (raw === undefined || raw === '') return fallback;
@@ -24,17 +20,6 @@ function parsePositiveInt(field: string, raw: string | undefined, fallback: numb
     const range = max === undefined ? 'a positive integer' : `an integer between 1 and ${max}`;
     throw new ValidationException(`${field} must be ${range}`, [
       { field, rule: 'range', min: 1, ...(max === undefined ? {} : { max }) },
-    ]);
-  }
-  return value;
-}
-
-function parseBoolean(field: string, raw: string | undefined): boolean | undefined {
-  if (raw === undefined || raw === '') return undefined;
-  const value = BOOLEAN_VALUES[raw];
-  if (value === undefined) {
-    throw new ValidationException(`${field} must be true or false`, [
-      { field, rule: 'enum', allowed: Object.keys(BOOLEAN_VALUES) },
     ]);
   }
   return value;
@@ -55,7 +40,6 @@ export function parseCommentListQuery(query: RawCommentListQuery): CommentListPa
   return {
     page: parsePositiveInt('page', query.page, 1),
     pageSize: parsePositiveInt('page_size', query.page_size, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE),
-    isValid: parseBoolean('is_valid', query.is_valid),
     search: parseSearch(query.q),
   };
 }

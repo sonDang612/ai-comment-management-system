@@ -45,12 +45,14 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
   It runs the queue worker and the offline classifier training (`acms_ai.training`). Any data it needs comes from the
   job payload or exported JSONL files.
-- This system only checks comments: it stores and returns `content`, `is_valid`, `is_question`, `category`, `confidence` and
-  `reason`. It has no comment status (`approved` / `pending` / `disabled`) and no decision source; the integrating
-  system decides what to do with the result.
+- This system only checks comments: it stores and returns `content`, `category`, `reason` and the raw classifier
+  output (`ai_scores` column, `model_output` in the API: the TEI logits plus the softmax of each head). It has no
+  comment status (`approved` / `pending` / `disabled`) and no decision source; the integrating system decides what
+  to do with the result.
 - Rule-based checks (from the admin rule settings) run in the API (`modules/moderation/rules`) before the AI.
-  The AI is called only when every rule passes; a failed rule stores `is_valid = false` with confidence 1.0.
-  When the rule check or the AI fails, the result fields stay `null` (unchecked).
+  The AI is called only when every rule passes; a failed rule stores its reason with `category = null` and no scores.
+  When the rule check or the AI fails, the result fields stay `null` (unchecked). Below `AI_CONFIDENCE_THRESHOLD`,
+  only the raw scores are stored.
 - API: controllers stay thin, logic lives in services, infrastructure clients live in `src/infrastructure`.
   Throw `AppException` subclasses, never raw errors.
 - AI: shared code in `core/`. `core` never imports `worker` or `training`, and they never import each other.

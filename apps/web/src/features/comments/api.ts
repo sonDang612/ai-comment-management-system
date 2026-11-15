@@ -12,7 +12,6 @@ const COMMENTS_PATH = `${API_V1_PREFIX}/comments`;
 export interface CommentListParams {
   page: number;
   pageSize: number;
-  isValid?: boolean;
   search?: string;
 }
 
@@ -30,7 +29,6 @@ export function commentListQueryOptions(params: CommentListParams) {
         query: {
           page: params.page,
           page_size: params.pageSize,
-          is_valid: params.isValid,
           q: params.search,
         },
       }),

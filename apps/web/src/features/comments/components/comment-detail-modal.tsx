@@ -1,13 +1,67 @@
 "use client";
 
-import { Descriptions, type DescriptionsProps, Modal, Typography } from "antd";
+import type { CommentModelOutput, ModelOutputScore } from "@acms/shared";
+import { Descriptions, type DescriptionsProps, Modal, Table, type TableColumnsType, Typography } from "antd";
 import { useI18n } from "@/i18n";
 import { formatDateTime } from "@/lib/datetime";
 import { useCommentsUiStore } from "../store";
-import { CategoryTag } from "./category-tag";
-import { CheckResultTag } from "./check-result-tag";
+import { CategoryPrediction, formatModelValue, headProbability, LabelPrediction, TopLogit } from "./model-output";
 
-const CONFIDENCE_FRACTION_DIGITS = 2;
+const JSON_INDENT = 2;
+
+function RawScores({ output }: { output: CommentModelOutput }) {
+  const { dict } = useI18n();
+  const t = dict.comments;
+  const columns: TableColumnsType<ModelOutputScore> = [
+    {
+      key: "label",
+      title: t.columns.outputLabel,
+      render: (_, score) => <code className="text-xs">{score.label}</code>,
+    },
+    {
+      key: "score",
+      title: t.columns.logit,
+      width: 120,
+      align: "right",
+      render: (_, score) => <span className="font-mono">{formatModelValue(score.score)}</span>,
+    },
+    {
+      key: "probability",
+      title: t.columns.headProbability,
+      width: 170,
+      align: "right",
+      render: (_, score) => {
+        const probability = headProbability(output, score.label);
+        return <span className="font-mono">{probability === null ? "-" : formatModelValue(probability)}</span>;
+      },
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Typography.Title level={5} className="!mb-0">
+        {t.rawOutput}
+      </Typography.Title>
+      <Table<ModelOutputScore>
+        rowKey="label"
+        size="small"
+        bordered
+        pagination={false}
+        columns={columns}
+        dataSource={output.scores}
+      />
+      <Typography.Text type="secondary">{t.rawJson}</Typography.Text>
+      <Typography.Paragraph
+        copyable={{ text: JSON.stringify(output.scores) }}
+        className="!mb-0 max-h-64 overflow-auto rounded bg-black/5 p-3 dark:bg-white/10"
+      >
+        <pre className="!m-0 !bg-transparent !p-0 font-mono text-xs">
+          {JSON.stringify(output.scores, null, JSON_INDENT)}
+        </pre>
+      </Typography.Paragraph>
+    </div>
+  );
+}
 
 export function CommentDetailModal() {
   const { dict, locale } = useI18n();
@@ -27,40 +81,19 @@ export function CommentDetailModal() {
           ),
         },
         {
-          key: "is_valid",
-          label: t.columns.isValid,
-          children: (
-            <CheckResultTag
-              value={comment.is_valid}
-              trueLabel={t.validity.valid}
-              falseLabel={t.validity.invalid}
-              trueColor="success"
-              falseColor="error"
-            />
-          ),
+          key: "top_logit",
+          label: t.columns.topLogit,
+          children: <TopLogit output={comment.model_output} />,
         },
         {
-          key: "is_question",
-          label: t.columns.isQuestion,
-          children: (
-            <CheckResultTag
-              value={comment.is_question}
-              trueLabel={t.yes}
-              falseLabel={t.no}
-              trueColor="processing"
-              falseColor="default"
-            />
-          ),
+          key: "label_softmax",
+          label: t.columns.labelSoftmax,
+          children: <LabelPrediction output={comment.model_output} />,
         },
         {
-          key: "category",
-          label: t.columns.category,
-          children: <CategoryTag category={comment.category} />,
-        },
-        {
-          key: "confidence",
-          label: t.columns.confidence,
-          children: comment.confidence?.toFixed(CONFIDENCE_FRACTION_DIGITS) ?? "-",
+          key: "category_softmax",
+          label: t.columns.categorySoftmax,
+          children: <CategoryPrediction output={comment.model_output} />,
         },
         {
           key: "reason",
@@ -91,10 +124,17 @@ export function CommentDetailModal() {
       open={comment !== null}
       onCancel={closeDetail}
       footer={null}
-      width={640}
+      width={760}
       destroyOnHidden
     >
-      <Descriptions column={1} bordered size="small" items={items} className="pt-2" />
+      <div className="flex flex-col gap-4 pt-2">
+        <Descriptions column={1} bordered size="small" items={items} />
+        {comment?.model_output ? (
+          <RawScores output={comment.model_output} />
+        ) : (
+          <Typography.Text type="secondary">{t.modelNotCalled}</Typography.Text>
+        )}
+      </div>
     </Modal>
   );
 }

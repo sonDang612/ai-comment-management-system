@@ -1,4 +1,10 @@
-import { COMMENT_CATEGORIES, type AiCommentAnalysis, type CommentCategory } from '@acms/shared';
+import {
+  COMMENT_CATEGORIES,
+  type AiCommentAnalysis,
+  type CommentCategory,
+  type CommentModelOutput,
+  type ModelOutputScore,
+} from '@acms/shared';
 
 export const MODERATION_LABELS = ['valid', 'invalid'] as const;
 export type ModerationLabel = (typeof MODERATION_LABELS)[number];
@@ -37,10 +43,7 @@ const LEGACY_CATEGORIES: Record<LegacyModerationLabel, CommentCategory | null> =
   invalid: null,
 };
 
-export interface OutputScore {
-  label: string;
-  score: number;
-}
+export type OutputScore = ModelOutputScore;
 
 export interface CommentPrediction {
   label: ModerationLabel;
@@ -73,32 +76,85 @@ export function servesModerationOutputs(names: readonly string[]): boolean {
   return isTwoHeadModel(names) || isLegacyModel(names);
 }
 
-function softmax<T extends string>(logits: Map<string, number>, names: readonly T[]): { name: T; probability: number } {
+interface Probability<T extends string> {
+  name: T;
+  probability: number;
+}
+
+function softmax<T extends string>(logits: Map<string, number>, names: readonly T[]): Probability<T>[] {
   const values = names.map((name) => logits.get(name) ?? Number.NaN);
   const max = Math.max(...values);
   const exponents = values.map((value) => Math.exp(value - max));
   const total = exponents.reduce((sum, value) => sum + value, 0);
-  const best = exponents.indexOf(Math.max(...exponents));
-  return { name: names[best]!, probability: exponents[best]! / total };
+  return names.map((name, index) => ({ name, probability: exponents[index]! / total }));
 }
 
-function topOf<T extends string>(logits: Map<string, number>, head: string, values: readonly T[]): { name: T; probability: number } {
+function headSoftmax<T extends string>(logits: Map<string, number>, head: string, values: readonly T[]): Probability<T>[] {
   const headLogits = new Map(values.map((value) => [value, logits.get(outputName(head, value)) ?? Number.NaN]));
   return softmax(headLogits, values);
 }
 
+function mostLikely<T extends string>(probabilities: Probability<T>[]): Probability<T> {
+  return probabilities.reduce((best, candidate) => (candidate.probability > best.probability ? candidate : best));
+}
+
+function byProbabilityDesc<T extends string>(probabilities: Probability<T>[]): Probability<T>[] {
+  return [...probabilities].sort((left, right) => right.probability - left.probability);
+}
+
+function hasFiniteScores(scores: readonly OutputScore[]): boolean {
+  return scores.every((score) => Number.isFinite(score.score));
+}
+
+export function isOutputScoreList(value: unknown): value is OutputScore[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item: unknown) =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as Record<string, unknown>)['label'] === 'string' &&
+        typeof (item as Record<string, unknown>)['score'] === 'number',
+    )
+  );
+}
+
+export function describeModelOutput(scores: readonly OutputScore[]): CommentModelOutput {
+  const sortedScores = [...scores].sort((left, right) => right.score - left.score);
+  const names = scores.map((score) => score.label);
+  const logits = new Map(scores.map((score) => [score.label, score.score]));
+  const empty: CommentModelOutput = { scores: sortedScores, label_probabilities: [], category_probabilities: [] };
+  if (!hasFiniteScores(scores)) return empty;
+
+  if (isTwoHeadModel(names)) {
+    return {
+      scores: sortedScores,
+      label_probabilities: byProbabilityDesc(headSoftmax(logits, LABEL_HEAD, MODERATION_LABELS)),
+      category_probabilities: byProbabilityDesc(headSoftmax(logits, CATEGORY_HEAD, COMMENT_CATEGORIES)),
+    };
+  }
+  if (isLegacyModel(names)) {
+    return {
+      scores: sortedScores,
+      label_probabilities: byProbabilityDesc(softmax(logits, LEGACY_MODERATION_LABELS)),
+      category_probabilities: [],
+    };
+  }
+  return empty;
+}
+
 export function predictFromLogits(scores: readonly OutputScore[]): CommentPrediction | null {
-  if (!scores.every((score) => Number.isFinite(score.score))) return null;
+  if (!hasFiniteScores(scores)) return null;
   const names = scores.map((score) => score.label);
   const logits = new Map(scores.map((score) => [score.label, score.score]));
 
   if (isTwoHeadModel(names)) {
-    const label = topOf(logits, LABEL_HEAD, MODERATION_LABELS);
-    const category = topOf(logits, CATEGORY_HEAD, COMMENT_CATEGORIES);
+    const label = mostLikely(headSoftmax(logits, LABEL_HEAD, MODERATION_LABELS));
+    const category = mostLikely(headSoftmax(logits, CATEGORY_HEAD, COMMENT_CATEGORIES));
     return { label: label.name, confidence: label.probability, category: category.name };
   }
   if (isLegacyModel(names)) {
-    const legacy = softmax(logits, LEGACY_MODERATION_LABELS);
+    const legacy = mostLikely(softmax(logits, LEGACY_MODERATION_LABELS));
     return {
       label: legacy.name === 'invalid' ? 'invalid' : 'valid',
       confidence: legacy.probability,

@@ -1,7 +1,7 @@
 "use client";
 
 import { COMMENT_PAGE_SIZES, COMMENT_SEARCH_MAX_LENGTH, type CommentDto } from "@acms/shared";
-import { Alert, Button, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
+import { Alert, Button, Input, Skeleton, Table, type TableColumnsType, Typography } from "antd";
 import { Eye, Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
@@ -10,9 +10,8 @@ import { formatDateTime } from "@/lib/datetime";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { useTableBodyHeight } from "@/lib/use-table-body-height";
 import { useComments } from "../api";
-import { type CommentValidityFilter, useCommentsUiStore } from "../store";
-import { CategoryTag } from "./category-tag";
-import { CheckResultTag } from "./check-result-tag";
+import { useCommentsUiStore } from "../store";
+import { CategoryPrediction, LabelPrediction, TopLogit } from "./model-output";
 
 const SEARCH_DEBOUNCE_MS = 400;
 const SKELETON_ROW_COUNT = 8;
@@ -36,17 +35,12 @@ function isSkeletonRow(row: CommentRow): row is SkeletonRow {
 const textSkeleton = <Skeleton.Input active size="small" block />;
 const tagSkeleton = <Skeleton.Button active size="small" />;
 
-const VALIDITY_FILTERS: CommentValidityFilter[] = ["all", "valid", "invalid"];
-const CONFIDENCE_FRACTION_DIGITS = 2;
-
 export function CommentTable() {
   const { dict, locale } = useI18n();
   const t = dict.comments;
   const page = useCommentsUiStore((state) => state.page);
   const pageSize = useCommentsUiStore((state) => state.pageSize);
-  const validityFilter = useCommentsUiStore((state) => state.validityFilter);
   const setPagination = useCommentsUiStore((state) => state.setPagination);
-  const setValidityFilter = useCommentsUiStore((state) => state.setValidityFilter);
   const openCreate = useCommentsUiStore((state) => state.openCreate);
   const openDetail = useCommentsUiStore((state) => state.openDetail);
   const search = useCommentsUiStore((state) => state.search);
@@ -56,7 +50,6 @@ export function CommentTable() {
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useComments({
     page,
     pageSize,
-    isValid: validityFilter === "all" ? undefined : validityFilter === "valid",
     search: search || undefined,
   });
   const isLoadingRows = isPending || isPlaceholderData;
@@ -83,51 +76,22 @@ export function CommentTable() {
         ),
     },
     {
-      key: "is_valid",
-      title: t.columns.isValid,
-      width: 100,
-      render: (_, row) =>
-        isSkeletonRow(row) ? (
-          tagSkeleton
-        ) : (
-          <CheckResultTag
-            value={row.is_valid}
-            trueLabel={t.validity.valid}
-            falseLabel={t.validity.invalid}
-            trueColor="success"
-            falseColor="error"
-          />
-        ),
+      key: "top_logit",
+      title: t.columns.topLogit,
+      width: 230,
+      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : <TopLogit output={row.model_output} />),
     },
     {
-      key: "is_question",
-      title: t.columns.isQuestion,
-      width: 120,
-      render: (_, row) =>
-        isSkeletonRow(row) ? (
-          tagSkeleton
-        ) : (
-          <CheckResultTag
-            value={row.is_question}
-            trueLabel={t.yes}
-            falseLabel={t.no}
-            trueColor="processing"
-            falseColor="default"
-          />
-        ),
+      key: "label_softmax",
+      title: t.columns.labelSoftmax,
+      width: 170,
+      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <LabelPrediction output={row.model_output} />),
     },
     {
-      key: "category",
-      title: t.columns.category,
-      width: 130,
-      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryTag category={row.category} />),
-    },
-    {
-      key: "confidence",
-      title: t.columns.confidence,
-      width: 130,
-      render: (_, row) =>
-        isSkeletonRow(row) ? textSkeleton : (row.confidence?.toFixed(CONFIDENCE_FRACTION_DIGITS) ?? "-"),
+      key: "category_softmax",
+      title: t.columns.categorySoftmax,
+      width: 210,
+      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryPrediction output={row.model_output} />),
     },
     {
       key: "created_at",
@@ -177,16 +141,6 @@ export function CommentTable() {
             maxLength={COMMENT_SEARCH_MAX_LENGTH}
             className="!w-64"
           />
-          <Select<CommentValidityFilter>
-            value={validityFilter}
-            onChange={setValidityFilter}
-            aria-label={t.filterLabel}
-            className="w-40"
-            options={VALIDITY_FILTERS.map((filter) => ({
-              value: filter,
-              label: filter === "all" ? t.filterAll : t.validity[filter],
-            }))}
-          />
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -222,7 +176,7 @@ export function CommentTable() {
           columns={columns}
           dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
-          scroll={{ x: 1030, y: tableBodyHeight }}
+          scroll={{ x: 1100, y: tableBodyHeight }}
           pagination={{
             current: page,
             pageSize,

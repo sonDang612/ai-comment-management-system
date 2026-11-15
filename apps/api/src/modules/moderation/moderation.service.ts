@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AiCommentAnalysis } from '@acms/shared';
+import type { AiCommentAnalysis, ModelOutputScore } from '@acms/shared';
 import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
-import type { Comment } from '../../generated/prisma/client.js';
+import { type Comment, Prisma } from '../../generated/prisma/client.js';
 import { RuleSettingsService } from '../rule-settings/rule-settings.service.js';
 import { COMMENT_ANALYZER, type CommentAnalyzer } from './analysis/comment-analyzer.js';
 import { RuleChecker, type RuleViolation } from './rules/rule-checker.js';
@@ -49,17 +49,17 @@ export class ModerationService {
       return comment;
     }
 
-    if (violations.length > 0) return this.saveResult(comment, ruleViolationResult(violations));
+    if (violations.length > 0) return this.saveResult(comment, ruleViolationResult(violations), null);
 
     try {
-      const analysis = await this.analyzer.analyze({ comment_id: comment.id, content: comment.content });
+      const { analysis, scores } = await this.analyzer.analyze({ comment_id: comment.id, content: comment.content });
       if (!this.isConfident(analysis)) {
         this.logger.log(
           `AI confidence ${analysis.confidence.toFixed(2)} is below ${this.confidenceThreshold} for comment ${comment.id}, it stays unchecked`,
         );
-        return comment;
+        return this.saveScores(comment, scores);
       }
-      return this.saveResult(comment, analysis);
+      return this.saveResult(comment, analysis, scores);
     } catch (error) {
       this.logger.warn(`Analysis failed for comment ${comment.id}, it stays unchecked: ${errorMessage(error)}`);
       return comment;
@@ -70,15 +70,22 @@ export class ModerationService {
     return analysis.is_question || analysis.confidence >= this.confidenceThreshold;
   }
 
-  private saveResult(comment: Comment, result: AiCommentAnalysis): Promise<Comment> {
+  private toScoresColumn(scores: ModelOutputScore[] | null): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    return scores === null ? Prisma.DbNull : scores.map(({ label, score }) => ({ label, score }));
+  }
+
+  private saveScores(comment: Comment, scores: ModelOutputScore[] | null): Promise<Comment> {
+    if (scores === null) return Promise.resolve(comment);
+    return this.prisma.comment.update({ where: { id: comment.id }, data: { aiScores: this.toScoresColumn(scores) } });
+  }
+
+  private saveResult(comment: Comment, result: AiCommentAnalysis, scores: ModelOutputScore[] | null): Promise<Comment> {
     return this.prisma.comment.update({
       where: { id: comment.id },
       data: {
-        isValid: result.is_valid,
-        isQuestion: result.is_question,
         category: result.category,
-        confidence: result.confidence,
         reason: result.reason,
+        aiScores: this.toScoresColumn(scores),
         moderatedAt: new Date(),
       },
     });

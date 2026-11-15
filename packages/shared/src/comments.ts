@@ -20,14 +20,28 @@ export interface CreateCommentRequest {
   content: string;
 }
 
+export interface ModelOutputScore {
+  label: string;
+  score: number;
+}
+
+export interface ModelOutputProbability {
+  name: string;
+  probability: number;
+}
+
+export interface CommentModelOutput {
+  scores: ModelOutputScore[];
+  label_probabilities: ModelOutputProbability[];
+  category_probabilities: ModelOutputProbability[];
+}
+
 export interface CommentDto {
   id: string;
   content: string;
-  is_valid: boolean | null;
-  is_question: boolean | null;
   category: CommentCategory | null;
-  confidence: number | null;
   reason: string | null;
+  model_output: CommentModelOutput | null;
   moderated_at: string | null;
   created_at: string;
   updated_at: string;
@@ -41,7 +55,6 @@ export const COMMENT_SEARCH_MAX_LENGTH = 200;
 export interface CommentListQuery {
   page?: number;
   page_size?: number;
-  is_valid?: boolean;
   q?: string;
 }
 

@@ -1,5 +1,4 @@
 export { commentKeys, commentListQueryOptions, useComments, useCreateComment } from "./api";
-export { CheckResultTag } from "./components/check-result-tag";
 export { CommentDetailModal } from "./components/comment-detail-modal";
 export { CreateCommentModal } from "./components/comment-form";
 export { CommentTable } from "./components/comment-table";

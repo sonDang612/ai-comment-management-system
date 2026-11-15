@@ -2,7 +2,7 @@
 
 import { COMMENT_CONTENT_MAX_LENGTH } from "@acms/shared";
 import { App, Input, Modal } from "antd";
-import { format, useI18n } from "@/i18n";
+import { useI18n } from "@/i18n";
 import { apiErrorMessage } from "@/lib/api";
 import { useCreateComment } from "../api";
 import { useCommentsUiStore } from "../store";
@@ -25,13 +25,11 @@ export function CreateCommentModal() {
     createComment.mutate(
       { content },
       {
-        onSuccess: (comment) => {
+        onSuccess: () => {
           clearDraft();
           closeCreate();
           showFirstPage();
-          const result =
-            comment.is_valid === null ? t.validity.unchecked : comment.is_valid ? t.validity.valid : t.validity.invalid;
-          message.success(format(t.submitted, { result }));
+          message.success(t.submitted);
         },
         onError: (error) => {
           message.error(apiErrorMessage(error, dict));

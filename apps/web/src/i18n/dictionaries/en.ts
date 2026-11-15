@@ -62,6 +62,7 @@ const en: Dictionary = {
     detailTitle: "Comment details",
     modelNotCalled: "No model output (blocked by a rule, model disabled or the call failed)",
     unchecked: "Unchecked",
+    ruleBlocked: "Blocked by rule",
     afterSubmit: "({seconds}s after submit)",
     modelOutput: {
       tab: "Model output",

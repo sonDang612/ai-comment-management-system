@@ -1,6 +1,6 @@
 "use client";
 
-import type { CommentModelOutput, ModelOutputProbability, ModelOutputScore } from "@acms/shared";
+import type { CommentDto, CommentModelOutput, ModelOutputProbability, ModelOutputScore } from "@acms/shared";
 import { Tag } from "antd";
 import { useI18n } from "@/i18n";
 
@@ -11,6 +11,7 @@ const PERCENT_CEILING = 0.9999;
 const PERCENT_FLOOR = 0.0001;
 const HEAD_SEPARATOR = ":";
 const INVALID_LABEL = "invalid";
+const RULE_CONFIDENCE = 1;
 const VALID_CATEGORIES: ReadonlySet<string> = new Set(["statement", "question", "off_topic"]);
 
 const LABEL_COLORS: Record<string, string> = {
@@ -78,6 +79,26 @@ function splitOutputName(qualified: string): { head: ModelHeadName | null; name:
   return { head: null, name: qualified };
 }
 
+export type CheckSource = "model" | "rule" | "unchecked" | "none";
+
+export function checkSource(comment: CommentDto): CheckSource {
+  if (comment.model_output) return "model";
+  if (!comment.moderated_at) return "unchecked";
+  if (comment.reason) return "rule";
+  return "none";
+}
+
+function NoModelOutput({ source }: { source: CheckSource }) {
+  const { dict } = useI18n();
+  if (source === "unchecked") return <span className="text-muted-foreground">{dict.comments.unchecked}</span>;
+  return "-";
+}
+
+function RuleBlockedTag() {
+  const { dict } = useI18n();
+  return <Tag color="purple">{dict.comments.ruleBlocked}</Tag>;
+}
+
 export function topScore(output: CommentModelOutput | null): ModelOutputScore | null {
   return output?.scores[0] ?? null;
 }
@@ -115,10 +136,12 @@ export function labelCategoryDisagree(output: CommentModelOutput): boolean {
   return VALID_CATEGORIES.has(category) === isInvalidLabel(label);
 }
 
-export function TopLogit({ output }: { output: CommentModelOutput | null }) {
+export function TopLogit({ comment }: { comment: CommentDto }) {
   const { dict } = useI18n();
-  const score = topScore(output);
-  if (!score) return "-";
+  const source = checkSource(comment);
+  if (source === "rule") return <RuleBlockedTag />;
+  const score = topScore(comment.model_output);
+  if (!score) return <NoModelOutput source={source} />;
   const { head, name } = splitOutputName(score.label);
   const colors = head === "label" ? LABEL_COLORS : CATEGORY_COLORS;
   return (
@@ -152,10 +175,26 @@ function HeadPrediction({
   );
 }
 
-export function LabelPrediction({ output }: { output: CommentModelOutput | null }) {
-  return <HeadPrediction head="label" best={output?.label_probabilities[0]} colors={LABEL_COLORS} />;
+export function LabelPrediction({ comment }: { comment: CommentDto }) {
+  const source = checkSource(comment);
+  if (source === "rule") {
+    return (
+      <HeadPrediction
+        head="label"
+        best={{ name: INVALID_LABEL, probability: RULE_CONFIDENCE }}
+        colors={LABEL_COLORS}
+      />
+    );
+  }
+  const best = comment.model_output?.label_probabilities[0];
+  if (!best) return <NoModelOutput source={source} />;
+  return <HeadPrediction head="label" best={best} colors={LABEL_COLORS} />;
 }
 
-export function CategoryPrediction({ output }: { output: CommentModelOutput | null }) {
-  return <HeadPrediction head="category" best={output?.category_probabilities[0]} colors={CATEGORY_COLORS} />;
+export function CategoryPrediction({ comment }: { comment: CommentDto }) {
+  const source = checkSource(comment);
+  if (source === "rule") return <RuleBlockedTag />;
+  const best = comment.model_output?.category_probabilities[0];
+  if (!best) return <NoModelOutput source={source} />;
+  return <HeadPrediction head="category" best={best} colors={CATEGORY_COLORS} />;
 }

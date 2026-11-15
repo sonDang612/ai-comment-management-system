@@ -79,19 +79,19 @@ export function CommentTable() {
       key: "top_logit",
       title: t.columns.topLogit,
       width: 230,
-      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : <TopLogit output={row.model_output} />),
+      render: (_, row) => (isSkeletonRow(row) ? textSkeleton : <TopLogit comment={row} />),
     },
     {
       key: "label",
       title: t.columns.label,
       width: 170,
-      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <LabelPrediction output={row.model_output} />),
+      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <LabelPrediction comment={row} />),
     },
     {
       key: "category",
       title: t.columns.category,
       width: 210,
-      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryPrediction output={row.model_output} />),
+      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryPrediction comment={row} />),
     },
     {
       key: "created_at",

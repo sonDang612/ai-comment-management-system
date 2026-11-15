@@ -66,6 +66,7 @@ const zhCN = {
     detailTitle: "评论详情",
     modelNotCalled: "无模型输出（被规则拦截、模型未启用或调用失败）",
     unchecked: "未检测",
+    ruleBlocked: "规则拦截",
     afterSubmit: "（提交后 {seconds} 秒）",
     modelOutput: {
       tab: "模型输出",

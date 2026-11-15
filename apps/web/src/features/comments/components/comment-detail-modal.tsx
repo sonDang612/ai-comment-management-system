@@ -8,7 +8,16 @@ import { format, useI18n } from "@/i18n";
 import { formatDateTime } from "@/lib/datetime";
 import { useCommentsUiStore } from "../store";
 import { ModelHeadCard } from "./model-head-card";
-import { formatPercent, isInvalidLabel, labelCategoryDisagree, modelClassName, modelHeads } from "./model-output";
+import {
+  CategoryPrediction,
+  checkSource,
+  formatPercent,
+  isInvalidLabel,
+  LabelPrediction,
+  labelCategoryDisagree,
+  modelClassName,
+  modelHeads,
+} from "./model-output";
 
 const SECONDS_FRACTION_DIGITS = 2;
 const MILLISECONDS_PER_SECOND = 1000;
@@ -41,8 +50,21 @@ function PredictionChip({
   );
 }
 
-function Prediction({ output }: { output: CommentModelOutput | null }) {
+function RulePrediction({ comment }: { comment: CommentDto }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <LabelPrediction comment={comment} />
+      <CategoryPrediction comment={comment} />
+    </div>
+  );
+}
+
+function Prediction({ comment }: { comment: CommentDto }) {
   const { dict } = useI18n();
+  const output = comment.model_output;
+  const source = checkSource(comment);
+  if (source === "rule") return <RulePrediction comment={comment} />;
+  if (source === "unchecked") return <span className="text-muted-foreground">{dict.comments.unchecked}</span>;
   const names = dict.comments.modelClasses;
   const label = output?.label_probabilities[0];
   const category = output?.category_probabilities[0];
@@ -119,7 +141,7 @@ function CommentDetail({ comment }: { comment: CommentDto }) {
           <span className="whitespace-pre-wrap break-all text-[15px]">{comment.content || "-"}</span>
         </SummaryRow>
         <SummaryRow label={t.columns.prediction}>
-          <Prediction output={comment.model_output} />
+          <Prediction comment={comment} />
         </SummaryRow>
         <SummaryRow label={t.columns.reason}>
           <span className="whitespace-pre-wrap break-all">{comment.reason ?? "-"}</span>

@@ -13,6 +13,11 @@ const ANTD_LOCALES = {
   en: enUS,
 } satisfies Record<Locale, typeof zhCN>;
 
+const SIZE_TOKENS = {
+  fontSize: 13,
+  controlHeight: 30,
+};
+
 export function AntdProvider({ children }: { children: ReactNode }) {
   const { locale } = useI18n();
   const scheme = useTheme((state) => state.scheme);
@@ -23,6 +28,7 @@ export function AntdProvider({ children }: { children: ReactNode }) {
         theme={{
           algorithm: scheme === "dark" ? theme.darkAlgorithm : theme.defaultAlgorithm,
           cssVar: { key: `acms-${scheme}` },
+          token: SIZE_TOKENS,
         }}
       >
         <App>{children}</App>

@@ -2,6 +2,7 @@
 
 import type { CommentModelOutput, ModelOutputProbability, ModelOutputScore } from "@acms/shared";
 import { Tag } from "antd";
+import { useI18n } from "@/i18n";
 
 export const MODEL_VALUE_FRACTION_DIGITS = 4;
 
@@ -57,6 +58,26 @@ export function formatPercent(probability: number): string {
   return `${(probability * 100).toFixed(PERCENT_FRACTION_DIGITS)}%`;
 }
 
+export interface ModelClassNames {
+  heads: Record<string, string>;
+  label: Record<string, string>;
+  category: Record<string, string>;
+}
+
+export function modelClassName(names: ModelClassNames, head: ModelHeadName, name: string): string {
+  return names[head][name] ?? name;
+}
+
+export function modelHeadName(names: ModelClassNames, head: ModelHeadName): string {
+  return names.heads[head] ?? head;
+}
+
+function splitOutputName(qualified: string): { head: ModelHeadName | null; name: string } {
+  const [head, ...rest] = qualified.split(HEAD_SEPARATOR);
+  if (rest.length > 0 && (head === "label" || head === "category")) return { head, name: rest.join(HEAD_SEPARATOR) };
+  return { head: null, name: qualified };
+}
+
 export function topScore(output: CommentModelOutput | null): ModelOutputScore | null {
   return output?.scores[0] ?? null;
 }
@@ -95,22 +116,37 @@ export function labelCategoryDisagree(output: CommentModelOutput): boolean {
 }
 
 export function TopLogit({ output }: { output: CommentModelOutput | null }) {
+  const { dict } = useI18n();
   const score = topScore(output);
   if (!score) return "-";
+  const names = dict.comments.modelClasses;
+  const { head, name } = splitOutputName(score.label);
+  const displayName = head ? `${modelHeadName(names, head)} · ${modelClassName(names, head, name)}` : name;
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <code className="text-xs">{score.label}</code>
+      <span className="text-xs" title={score.label}>
+        {displayName}
+      </span>
       <span className="font-mono">{formatModelValue(score.score)}</span>
     </span>
   );
 }
 
-function HeadPrediction({ best, colors }: { best: ModelOutputProbability | undefined; colors: Record<string, string> }) {
+function HeadPrediction({
+  head,
+  best,
+  colors,
+}: {
+  head: ModelHeadName;
+  best: ModelOutputProbability | undefined;
+  colors: Record<string, string>;
+}) {
+  const { dict } = useI18n();
   if (!best) return "-";
   return (
     <span className="inline-flex items-center gap-1">
-      <Tag color={colors[best.name] ?? "default"} className="!font-mono">
-        {best.name}
+      <Tag color={colors[best.name] ?? "default"} title={best.name}>
+        {modelClassName(dict.comments.modelClasses, head, best.name)}
       </Tag>
       <span className="font-mono">{formatModelValue(best.probability)}</span>
     </span>
@@ -118,9 +154,9 @@ function HeadPrediction({ best, colors }: { best: ModelOutputProbability | undef
 }
 
 export function LabelPrediction({ output }: { output: CommentModelOutput | null }) {
-  return <HeadPrediction best={output?.label_probabilities[0]} colors={LABEL_COLORS} />;
+  return <HeadPrediction head="label" best={output?.label_probabilities[0]} colors={LABEL_COLORS} />;
 }
 
 export function CategoryPrediction({ output }: { output: CommentModelOutput | null }) {
-  return <HeadPrediction best={output?.category_probabilities[0]} colors={CATEGORY_COLORS} />;
+  return <HeadPrediction head="category" best={output?.category_probabilities[0]} colors={CATEGORY_COLORS} />;
 }

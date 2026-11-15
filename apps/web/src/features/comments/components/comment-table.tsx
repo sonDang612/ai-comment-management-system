@@ -82,14 +82,14 @@ export function CommentTable() {
       render: (_, row) => (isSkeletonRow(row) ? textSkeleton : <TopLogit output={row.model_output} />),
     },
     {
-      key: "label_softmax",
-      title: t.columns.labelSoftmax,
+      key: "label",
+      title: t.columns.label,
       width: 170,
       render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <LabelPrediction output={row.model_output} />),
     },
     {
-      key: "category_softmax",
-      title: t.columns.categorySoftmax,
+      key: "category",
+      title: t.columns.category,
       width: 210,
       render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryPrediction output={row.model_output} />),
     },

@@ -1,16 +1,15 @@
 "use client";
 
 import type { CommentDto, CommentModelOutput } from "@acms/shared";
-import { Modal, Tabs, type TabsProps, Typography } from "antd";
+import { Modal, Typography } from "antd";
 import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { format, useI18n } from "@/i18n";
 import { formatDateTime } from "@/lib/datetime";
 import { useCommentsUiStore } from "../store";
 import { ModelHeadCard } from "./model-head-card";
-import { formatPercent, isInvalidLabel, labelCategoryDisagree, modelHeads } from "./model-output";
+import { formatPercent, isInvalidLabel, labelCategoryDisagree, modelClassName, modelHeads } from "./model-output";
 
-const JSON_INDENT = 2;
 const SECONDS_FRACTION_DIGITS = 2;
 const MILLISECONDS_PER_SECOND = 1000;
 
@@ -23,17 +22,28 @@ function SummaryRow({ label, children }: { label: string; children: ReactNode })
   );
 }
 
-function PredictionChip({ name, probability, tone }: { name: string; probability: number; tone: string }) {
+function PredictionChip({
+  name,
+  code,
+  probability,
+  tone,
+}: {
+  name: string;
+  code: string;
+  probability: number;
+  tone: string;
+}) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[12.5px] ${tone}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12.5px] ${tone}`} title={code}>
       <b className="font-semibold">{name}</b>
-      <span className="opacity-70">{formatPercent(probability)}</span>
+      <span className="font-mono opacity-70">{formatPercent(probability)}</span>
     </span>
   );
 }
 
 function Prediction({ output }: { output: CommentModelOutput | null }) {
   const { dict } = useI18n();
+  const names = dict.comments.modelClasses;
   const label = output?.label_probabilities[0];
   const category = output?.category_probabilities[0];
   if (!output || (!label && !category)) return "-";
@@ -41,7 +51,8 @@ function Prediction({ output }: { output: CommentModelOutput | null }) {
     <div className="flex flex-wrap items-center gap-2">
       {label && (
         <PredictionChip
-          name={label.name}
+          name={modelClassName(names, "label", label.name)}
+          code={label.name}
           probability={label.probability}
           tone={
             isInvalidLabel(label.name)
@@ -52,7 +63,12 @@ function Prediction({ output }: { output: CommentModelOutput | null }) {
       )}
       {label && category && <span className="text-muted-foreground">·</span>}
       {category && (
-        <PredictionChip name={category.name} probability={category.probability} tone="bg-muted text-foreground" />
+        <PredictionChip
+          name={modelClassName(names, "category", category.name)}
+          code={category.name}
+          probability={category.probability}
+          tone="bg-muted text-foreground"
+        />
       )}
       {labelCategoryDisagree(output) && (
         <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
@@ -79,38 +95,18 @@ function CheckedAt({ comment }: { comment: CommentDto }) {
   );
 }
 
-function ModelOutputTabs({ output }: { output: CommentModelOutput }) {
+function ModelOutputSection({ output }: { output: CommentModelOutput }) {
   const { dict } = useI18n();
-  const t = dict.comments.modelOutput;
-  const items: TabsProps["items"] = [
-    {
-      key: "model",
-      label: t.tab,
-      children: (
-        <div className="grid gap-3">
-          {modelHeads(output).map((head) => (
-            <ModelHeadCard key={head.head} head={head} />
-          ))}
-        </div>
-      ),
-    },
-    {
-      key: "raw",
-      label: t.rawJson,
-      children: (
-        <div className="relative">
-          <Typography.Text
-            copyable={{ text: JSON.stringify(output.scores) }}
-            className="!absolute right-3 top-3"
-          />
-          <pre className="!m-0 max-h-96 overflow-auto rounded-lg border border-border bg-muted/40 p-4 font-mono text-[12.5px] leading-relaxed">
-            {JSON.stringify(output.scores, null, JSON_INDENT)}
-          </pre>
-        </div>
-      ),
-    },
-  ];
-  return <Tabs items={items} className="!mt-6" />;
+  return (
+    <section className="mt-6">
+      <h3 className="!mb-3 text-sm font-semibold">{dict.comments.modelOutput.tab}</h3>
+      <div className="grid gap-3">
+        {modelHeads(output).map((head) => (
+          <ModelHeadCard key={head.head} head={head} />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function CommentDetail({ comment }: { comment: CommentDto }) {
@@ -138,7 +134,7 @@ function CommentDetail({ comment }: { comment: CommentDto }) {
         </SummaryRow>
       </dl>
       {comment.model_output ? (
-        <ModelOutputTabs output={comment.model_output} />
+        <ModelOutputSection output={comment.model_output} />
       ) : (
         <Typography.Paragraph type="secondary" className="!mb-0 !mt-6">
           {t.modelNotCalled}

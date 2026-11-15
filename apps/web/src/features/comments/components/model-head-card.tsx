@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { format, useI18n } from "@/i18n";
-import { formatPercent, type ModelHead } from "./model-output";
+import { formatPercent, type ModelHead, modelClassName, modelHeadName } from "./model-output";
 
 const COLLAPSE_AFTER = 5;
 const COLLAPSED_ROW_COUNT = 3;
@@ -22,6 +22,7 @@ function marginTone(margin: number): string {
 export function ModelHeadCard({ head }: { head: ModelHead }) {
   const { dict } = useI18n();
   const t = dict.comments.modelOutput;
+  const names = dict.comments.modelClasses;
   const [expanded, setExpanded] = useState(false);
   const collapsible = head.classes.length > COLLAPSE_AFTER;
   const visibleClasses = collapsible && !expanded ? head.classes.slice(0, COLLAPSED_ROW_COUNT) : head.classes;
@@ -29,7 +30,9 @@ export function ModelHeadCard({ head }: { head: ModelHead }) {
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-muted/40">
       <div className="flex items-baseline justify-between border-b border-border px-4 py-2.5">
-        <h3 className="!m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{head.head}</h3>
+        <h3 className="!m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {modelHeadName(names, head.head)}
+        </h3>
         <div className="flex gap-3 font-mono text-xs text-muted-foreground">
           <span>{format(t.classCount, { count: String(head.classes.length) })}</span>
           {head.margin !== null && (
@@ -56,10 +59,10 @@ export function ModelHeadCard({ head }: { head: ModelHead }) {
             <li key={item.name} className={ROW_GRID}>
               <span className={`size-1.5 rounded-full ${isTop ? "bg-blue-500" : ""}`} />
               <span
-                className={`truncate font-mono text-[13px] ${isTop ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                className={`truncate text-[13px] ${isTop ? "font-semibold text-foreground" : "text-muted-foreground"}`}
                 title={`${head.head}:${item.name}`}
               >
-                {item.name}
+                {modelClassName(names, head.head, item.name)}
               </span>
               <span className="h-1.5 overflow-hidden rounded bg-border">
                 <span

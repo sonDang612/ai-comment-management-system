@@ -95,10 +95,10 @@ const en: Dictionary = {
   },
   comments: {
     title: "Comment management",
-    formTitle: "Post a comment",
+    formTitle: "Create",
     contentLabel: "Comment",
     contentPlaceholder: "Write a comment…",
-    create: "Post a comment",
+    create: "Create",
     submit: "Submit",
     cancel: "Cancel",
     submitted: "Comment submitted",

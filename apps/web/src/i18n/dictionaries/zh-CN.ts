@@ -99,10 +99,10 @@ const zhCN = {
   },
   comments: {
     title: "评论管理",
-    formTitle: "发表评论",
+    formTitle: "新建",
     contentLabel: "评论内容",
     contentPlaceholder: "请输入评论内容…",
-    create: "发表评论",
+    create: "新建",
     submit: "提交",
     cancel: "取消",
     submitted: "评论已提交",

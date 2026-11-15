@@ -119,14 +119,13 @@ export function TopLogit({ output }: { output: CommentModelOutput | null }) {
   const { dict } = useI18n();
   const score = topScore(output);
   if (!score) return "-";
-  const names = dict.comments.modelClasses;
   const { head, name } = splitOutputName(score.label);
-  const displayName = head ? `${modelHeadName(names, head)} · ${modelClassName(names, head, name)}` : name;
+  const colors = head === "label" ? LABEL_COLORS : CATEGORY_COLORS;
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <span className="text-xs" title={score.label}>
-        {displayName}
-      </span>
+    <span className="inline-flex items-center gap-1">
+      <Tag color={colors[name] ?? "default"} title={score.label}>
+        {head ? modelClassName(dict.comments.modelClasses, head, name) : name}
+      </Tag>
       <span className="font-mono">{formatModelValue(score.score)}</span>
     </span>
   );

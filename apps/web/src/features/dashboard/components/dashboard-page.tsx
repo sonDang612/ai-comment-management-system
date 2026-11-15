@@ -59,7 +59,7 @@ export function DashboardPage() {
       </div>
 
       {error && (
-        <Alert type="error" showIcon message={format(t.loadFailed, { message: apiErrorMessage(error, dict) })} />
+        <Alert type="error" showIcon title={format(t.loadFailed, { message: apiErrorMessage(error, dict) })} />
       )}
 
       {isPending && !error && <DashboardSkeleton />}

@@ -86,6 +86,8 @@ export interface CommentListQuery {
   q?: string;
   order?: CommentSortOrder;
   decided_by?: DecisionSource;
+  from?: string;
+  to?: string;
 }
 
 export interface CommentListResponse {

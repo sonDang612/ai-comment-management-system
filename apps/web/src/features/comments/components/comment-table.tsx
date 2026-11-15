@@ -7,8 +7,9 @@ import {
   DECISION_SOURCES,
   type DecisionSource,
 } from "@acms/shared";
-import { Alert, Button, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
+import { Alert, Button, DatePicker, Input, Select, Skeleton, Table, type TableColumnsType, Typography } from "antd";
 import type { SortOrder } from "antd/es/table/interface";
+import dayjs, { type Dayjs } from "dayjs";
 import { Eye, PencilLine, Plus, RotateCw, Search } from "lucide-react";
 import { type CSSProperties, useRef, useState } from "react";
 import { format, useI18n } from "@/i18n";
@@ -22,6 +23,16 @@ import { CategoryPrediction, DecisionSourceTag, LabelPrediction } from "./model-
 
 const SEARCH_DEBOUNCE_MS = 400;
 const SKELETON_ROW_COUNT = 8;
+const DATE_KEY_FORMAT = "YYYY-MM-DD";
+
+function toDayjs(dateKey: string | null): Dayjs | null {
+  return dateKey ? dayjs(dateKey) : null;
+}
+
+function toDateKey(date: Dayjs | null | undefined): string | null {
+  return date ? date.format(DATE_KEY_FORMAT) : null;
+}
+
 const SORT_DIRECTIONS: SortOrder[] = ["descend", "ascend", "descend"];
 
 interface SkeletonRow {
@@ -58,6 +69,9 @@ export function CommentTable() {
   const setOrder = useCommentsUiStore((state) => state.setOrder);
   const decidedBy = useCommentsUiStore((state) => state.decidedBy);
   const setDecidedBy = useCommentsUiStore((state) => state.setDecidedBy);
+  const dateFrom = useCommentsUiStore((state) => state.dateFrom);
+  const dateTo = useCommentsUiStore((state) => state.dateTo);
+  const setDateRange = useCommentsUiStore((state) => state.setDateRange);
   const [searchInput, setSearchInput] = useState(search);
   const debouncedSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), SEARCH_DEBOUNCE_MS);
   const { data, error, isPending, isFetching, isPlaceholderData, refetch } = useComments({
@@ -66,6 +80,8 @@ export function CommentTable() {
     search: search || undefined,
     order,
     decidedBy: decidedBy ?? undefined,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
   });
   const isLoadingRows = isPending || isPlaceholderData;
   const tableWrapperRef = useRef<HTMLDivElement>(null);
@@ -180,6 +196,14 @@ export function CommentTable() {
             aria-label={t.columns.decidedBy}
             options={DECISION_SOURCES.map((source) => ({ value: source, label: t.decisionSources[source] ?? source }))}
             className="!w-48"
+          />
+          <DatePicker.RangePicker
+            value={[toDayjs(dateFrom), toDayjs(dateTo)]}
+            onChange={(dates) => setDateRange(toDateKey(dates?.[0]), toDateKey(dates?.[1]))}
+            format={DATE_KEY_FORMAT}
+            placeholder={[t.dateFrom, t.dateTo]}
+            allowEmpty={[true, true]}
+            aria-label={t.dateRangeLabel}
           />
         </div>
         <div className="flex items-center gap-2">

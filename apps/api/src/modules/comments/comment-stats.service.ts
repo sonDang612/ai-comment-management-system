@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import type { CommentCategory, CommentDailyStats, CommentStatsResponse } from '@acms/shared';
+import { appDateKey, type CommentCategory, type CommentDailyStats, type CommentStatsResponse } from '@acms/shared';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service.js';
 import {
-  appDateKey,
   appDayKeys,
   average,
   checkSeconds,

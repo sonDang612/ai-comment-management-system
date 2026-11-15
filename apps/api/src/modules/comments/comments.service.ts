@@ -42,10 +42,21 @@ export class CommentsService {
     return toCommentDto(reviewed);
   }
 
-  async list({ page, pageSize, search, order, decidedBy }: CommentListParams): Promise<CommentListResponse> {
+  async list({
+    page,
+    pageSize,
+    search,
+    order,
+    decidedBy,
+    createdFrom,
+    createdBefore,
+  }: CommentListParams): Promise<CommentListResponse> {
     const where: Prisma.CommentWhereInput = {
       ...(search === undefined ? {} : { content: { contains: search, mode: 'insensitive' } }),
       ...(decidedBy === undefined ? {} : { decidedBy }),
+      ...(createdFrom === undefined && createdBefore === undefined
+        ? {}
+        : { createdAt: { gte: createdFrom, lt: createdBefore } }),
     };
     const [total, comments] = await this.prisma.$transaction([
       this.prisma.comment.count({ where }),

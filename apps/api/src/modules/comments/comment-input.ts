@@ -1,4 +1,7 @@
 import {
+  APP_DATE_KEY_PATTERN,
+  appDateKey,
+  startOfAppDateKey,
   COMMENT_SEARCH_MAX_LENGTH,
   COMMENT_SORT_ORDERS,
   DECISION_SOURCES,
@@ -18,6 +21,8 @@ export interface CommentListParams {
   search: string | undefined;
   order: CommentSortOrder;
   decidedBy: DecisionSource | undefined;
+  createdFrom: Date | undefined;
+  createdBefore: Date | undefined;
 }
 
 export interface RawCommentListQuery {
@@ -26,6 +31,8 @@ export interface RawCommentListQuery {
   q?: string;
   order?: string;
   decided_by?: string;
+  from?: string;
+  to?: string;
 }
 
 function parsePositiveInt(field: string, raw: string | undefined, fallback: number, max?: number): number {
@@ -73,6 +80,29 @@ function parseDecisionSource(raw: string | undefined): DecisionSource | undefine
   return source;
 }
 
+const MILLISECONDS_PER_DAY = 86_400_000;
+
+function parseDateKey(field: string, raw: string | undefined): Date | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  const start = APP_DATE_KEY_PATTERN.test(raw) ? startOfAppDateKey(raw) : null;
+  if (!start || Number.isNaN(start.getTime()) || appDateKey(start) !== raw) {
+    throw new ValidationException(`${field} must be a date in YYYY-MM-DD format`, [
+      { field, rule: 'date_format', format: 'YYYY-MM-DD' },
+    ]);
+  }
+  return start;
+}
+
+function parseCreatedRange(query: RawCommentListQuery): Pick<CommentListParams, 'createdFrom' | 'createdBefore'> {
+  const createdFrom = parseDateKey('from', query.from);
+  const lastDay = parseDateKey('to', query.to);
+  if (createdFrom && lastDay && createdFrom > lastDay) {
+    throw new ValidationException('from must not be after to', [{ field: 'from', rule: 'not_after', other: 'to' }]);
+  }
+  const createdBefore = lastDay ? new Date(lastDay.getTime() + MILLISECONDS_PER_DAY) : undefined;
+  return { createdFrom, createdBefore };
+}
+
 export interface RawCommentStatsQuery {
   days?: string;
 }
@@ -88,5 +118,6 @@ export function parseCommentListQuery(query: RawCommentListQuery): CommentListPa
     search: parseSearch(query.q),
     order: parseSortOrder(query.order),
     decidedBy: parseDecisionSource(query.decided_by),
+    ...parseCreatedRange(query),
   };
 }

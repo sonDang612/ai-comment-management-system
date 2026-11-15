@@ -18,6 +18,8 @@ export interface CommentListParams {
   search?: string;
   order: CommentSortOrder;
   decidedBy?: DecisionSource;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export const commentKeys = {
@@ -37,6 +39,8 @@ export function commentListQueryOptions(params: CommentListParams) {
           q: params.search,
           order: params.order,
           decided_by: params.decidedBy,
+          from: params.dateFrom,
+          to: params.dateTo,
         },
       }),
     placeholderData: keepPreviousData,

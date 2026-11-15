@@ -14,3 +14,20 @@ export const APP_TIME_ZONE = 'Asia/Shanghai';
 
 /** Fixed offset of `APP_TIME_ZONE` (it has no DST, so this never changes). */
 export const APP_UTC_OFFSET = '+08:00';
+
+export const APP_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const appDateKeyFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: APP_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function appDateKey(instant: Date): string {
+  return appDateKeyFormatter.format(instant);
+}
+
+export function startOfAppDateKey(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00${APP_UTC_OFFSET}`);
+}

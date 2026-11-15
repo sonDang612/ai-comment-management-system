@@ -1,6 +1,6 @@
 import {
-  APP_TIME_ZONE,
-  APP_UTC_OFFSET,
+  appDateKey,
+  startOfAppDateKey,
   COMMENT_OUTCOMES,
   type CommentCategory,
   type CommentOutcome,
@@ -11,13 +11,6 @@ import { isOutputScoreList, predictFromLogits } from '../moderation/analysis/mod
 const MILLISECONDS_PER_DAY = 86_400_000;
 const MILLISECONDS_PER_SECOND = 1000;
 const P95 = 0.95;
-
-const dateKeyFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: APP_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
 
 export interface StatsCommentRow {
   reason: string | null;
@@ -31,12 +24,8 @@ export interface ClassifiedComment {
   category: CommentCategory | null;
 }
 
-export function appDateKey(instant: Date): string {
-  return dateKeyFormatter.format(instant);
-}
-
 export function startOfAppDay(instant: Date): Date {
-  return new Date(`${appDateKey(instant)}T00:00:00${APP_UTC_OFFSET}`);
+  return startOfAppDateKey(appDateKey(instant));
 }
 
 export function appDayKeys(firstDay: Date, days: number): string[] {

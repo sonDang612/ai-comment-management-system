@@ -1,4 +1,10 @@
-import { COMMENT_SEARCH_MAX_LENGTH, DEFAULT_COMMENT_PAGE_SIZE, MAX_COMMENT_PAGE_SIZE } from '@acms/shared';
+import {
+  COMMENT_SEARCH_MAX_LENGTH,
+  DEFAULT_COMMENT_PAGE_SIZE,
+  DEFAULT_COMMENT_STATS_DAYS,
+  MAX_COMMENT_PAGE_SIZE,
+  MAX_COMMENT_STATS_DAYS,
+} from '@acms/shared';
 import { ValidationException } from '../../common/errors/app.exception.js';
 
 export interface CommentListParams {
@@ -34,6 +40,14 @@ function parseSearch(raw: string | undefined): string | undefined {
     ]);
   }
   return search;
+}
+
+export interface RawCommentStatsQuery {
+  days?: string;
+}
+
+export function parseCommentStatsDays(query: RawCommentStatsQuery): number {
+  return parsePositiveInt('days', query.days, DEFAULT_COMMENT_STATS_DAYS, MAX_COMMENT_STATS_DAYS);
 }
 
 export function parseCommentListQuery(query: RawCommentListQuery): CommentListParams {

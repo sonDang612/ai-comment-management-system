@@ -83,6 +83,24 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+:root {
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-series-3: #1baf7a;
+  --viz-series-4: #eda100;
+  --viz-neutral: #b4b2aa;
+  --viz-grid: oklch(0.922 0 0);
+}
+
+.dark {
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-series-3: #199e70;
+  --viz-series-4: #c98500;
+  --viz-neutral: #5f5e58;
+  --viz-grid: oklch(1 0 0 / 10%);
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

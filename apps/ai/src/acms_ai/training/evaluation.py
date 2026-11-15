@@ -7,13 +7,14 @@ from acms_ai.training.artifacts import read_json, utc_timestamp, write_json
 from acms_ai.training.config import EvaluationSettings, FineTuneConfig
 from acms_ai.training.dataset import LabeledComment
 from acms_ai.training.errors import ArtifactMismatchError, TrainingConfigError
-from acms_ai.training.labels import LABELS, ModerationLabel, flags_from_label
+from acms_ai.training.labels import CATEGORIES, LABELS, ModerationLabel
 from acms_ai.training.metrics import binary_metrics, classification_metrics
 from acms_ai.training.run import RunDirectory
-from acms_ai.training.scoring import ClassifierScorer, LabelScores
+from acms_ai.training.scoring import ClassifierScorer, CommentScores
 from acms_ai.training.splitting import SplitName
 from acms_ai.training.thresholds import (
     Thresholds,
+    gold_is_question,
     policy_metrics,
     policy_outcome,
     tune_thresholds,
@@ -26,7 +27,7 @@ TUNING_SPLIT: SplitName = "validation"
 
 def score_split(
     run: RunDirectory, config: FineTuneConfig, split: SplitName
-) -> tuple[list[LabeledComment], list[LabelScores]]:
+) -> tuple[list[LabeledComment], list[CommentScores]]:
     records = run.split_directory(config).load(split)
     logger.info("Scoring %d %s records", len(records), split)
     scorer = ClassifierScorer(run, config)
@@ -41,26 +42,32 @@ def target_check(value: float, target: float, *, at_most: bool = False) -> dict[
 
 def build_report(
     records: Sequence[LabeledComment],
-    scores: Sequence[LabelScores],
+    scores: Sequence[CommentScores],
     thresholds: Thresholds,
     settings: EvaluationSettings,
 ) -> dict[str, Any]:
-    gold = [record.label for record in records]
-    predicted = [score.predicted for score in scores]
-    classification = classification_metrics(gold, predicted, LABELS)
-    policy = policy_metrics(gold, scores, thresholds)
-    question = classification["per_class"][ModerationLabel.QUESTION.value]
+    policy = policy_metrics(records, scores, thresholds)
+    question = binary_metrics(
+        [gold_is_question(record) for record in records],
+        [score.is_question for score in scores],
+    )
     return {
         "records": len(records),
-        "classification": classification,
+        "classification": {
+            "label": classification_metrics(
+                [record.label for record in records], [score.predicted for score in scores], LABELS
+            ),
+            "category": classification_metrics(
+                [record.category for record in records],
+                [score.category for score in scores],
+                CATEGORIES,
+            ),
+        },
         "is_invalid": binary_metrics(
-            [label == ModerationLabel.INVALID for label in gold],
-            [label == ModerationLabel.INVALID for label in predicted],
+            [record.label == ModerationLabel.INVALID for record in records],
+            [score.predicted == ModerationLabel.INVALID for score in scores],
         ),
-        "is_question": binary_metrics(
-            [label == ModerationLabel.QUESTION for label in gold],
-            [label == ModerationLabel.QUESTION for label in predicted],
-        ),
+        "is_question": question,
         "threshold_policy": policy,
         "acceptance": {
             "invalid_precision_at_threshold": target_check(
@@ -81,23 +88,28 @@ def build_report(
 def write_predictions(
     path: Path,
     records: Sequence[LabeledComment],
-    scores: Sequence[LabelScores],
+    scores: Sequence[CommentScores],
     thresholds: Thresholds,
 ) -> None:
     rows = []
     for record, score in zip(records, scores, strict=True):
-        is_valid, is_question = flags_from_label(score.predicted)
         rows.append(
             {
                 "comment_id": record.comment_id,
                 "site_code": record.site_code,
-                "gold": record.label.value,
-                "predicted": score.predicted.value,
-                "is_valid": is_valid,
-                "is_question": is_question,
+                "gold": {"label": record.label.value, "category": record.category.value},
+                "predicted": {"label": score.predicted.value, "category": score.category.value},
+                "is_valid": score.predicted == ModerationLabel.VALID,
+                "is_question": score.is_question,
                 "confidence": score.confidence,
+                "category_confidence": score.category_confidence,
                 "outcome": policy_outcome(score, thresholds),
-                "probabilities": {label.value: p for label, p in score.probabilities.items()},
+                "probabilities": {
+                    "label": {label.value: p for label, p in score.label_probabilities.items()},
+                    "category": {
+                        category.value: p for category, p in score.category_probabilities.items()
+                    },
+                },
             }
         )
     write_json(path, rows)
@@ -106,7 +118,7 @@ def write_predictions(
 def tune(run: RunDirectory, evaluation_overrides: Mapping[str, Any]) -> dict[str, Any]:
     config = run.load_config(evaluation_overrides)
     records, scores = score_split(run, config, TUNING_SPLIT)
-    thresholds, tuning = tune_thresholds([r.label for r in records], scores, config.evaluation)
+    thresholds, tuning = tune_thresholds(records, scores, config.evaluation)
     payload = {
         "tuned_at": utc_timestamp(),
         "split": TUNING_SPLIT,

@@ -40,6 +40,7 @@ model Comment {
   content     String
   isValid     Boolean?  @map("is_valid")
   isQuestion  Boolean?  @map("is_question")
+  category    String?   @db.VarChar(32)
   confidence  Decimal?  @db.Decimal(3, 2)
   reason      String?
   moderatedAt DateTime? @map("moderated_at") @db.Timestamptz(3)

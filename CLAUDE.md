@@ -38,14 +38,14 @@ AI Comment Moderation service. Read `README.md` for the architecture, layout and
 - The NestJS API (`apps/api`) is the only public backend and the only owner of the database schema (Prisma).
   Python (`apps/ai`) never writes business tables: results go back to the API.
 - Online inference: the API calls Hugging Face TEI directly (`src/infrastructure/tei`, `POST /predict`). TEI serves
-  the fine-tuned `hfl/chinese-roberta-wwm-ext` 3-class classifier (`valid` / `question` / `invalid`) and only runs
+  the fine-tuned `hfl/chinese-roberta-wwm-ext` classifier with two heads (label `valid` / `invalid`, and a category) and only runs
   inference; the API validates the scores and decides the result (`modules/moderation/analysis`, labels mirror
   `acms_ai.training.labels`). There is no prompt and no FastAPI server. `AI_ANALYZER=stub` exists only for
   local/test/development.
 - `apps/ai` never connects to PostgreSQL (no driver, no ORM, no `DATABASE_URL`), not even to read.
   It runs the queue worker and the offline classifier training (`acms_ai.training`). Any data it needs comes from the
   job payload or exported JSONL files.
-- This system only checks comments: it stores and returns `content`, `is_valid`, `is_question`, `confidence` and
+- This system only checks comments: it stores and returns `content`, `is_valid`, `is_question`, `category`, `confidence` and
   `reason`. It has no comment status (`approved` / `pending` / `disabled`) and no decision source; the integrating
   system decides what to do with the result.
 - Rule-based checks (from the admin rule settings) run in the API (`modules/moderation/rules`) before the AI.

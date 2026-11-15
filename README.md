@@ -158,12 +158,17 @@ pnpm db:status
 `ModerationService` runs the rule checks first. Only when every rule passes does it ask the configured analyzer
 (`AI_ANALYZER`):
 
-- `classifier` (default): `ClassifierCommentAnalyzer` sends the comment text to TEI's `POST /predict`. TEI serves
-  the `model/` folder of a training run: `hfl/chinese-roberta-wwm-ext` fine-tuned as a 3-class classifier. The scores
-  are validated (exactly the labels `valid` / `question` / `invalid`, probabilities that sum to 1). The predicted
-  label is the one with the highest probability, the confidence is that probability, and the reason is a fixed
-  Simplified Chinese text per label (`modules/moderation/analysis/moderation-labels.ts`). There is no prompt, so
-  the comment cannot carry instructions.
+- `classifier` (default): `ClassifierCommentAnalyzer` sends the comment text to TEI's `POST /predict` with
+  `raw_scores: true`. TEI serves the `model/` folder of a training run: `hfl/chinese-roberta-wwm-ext` fine-tuned
+  with two independent heads on a shared encoder, stored as one classification layer whose outputs are
+  `label:valid`, `label:invalid` and `category:<name>` (`statement`, `question`, `off_topic`, `toxic`, `sexual`,
+  `spam`, `gibberish`, `advertisement`, `scam`, `privacy`, `illegal`, `political`). The API checks that exactly these
+  outputs come back with finite logits and applies a softmax per head. `is_valid` comes from the label head,
+  `category` from the category head, `is_question` is `is_valid && category == "question"`, the confidence is the
+  label head probability, and the reason is a fixed Simplified Chinese text per category
+  (`modules/moderation/analysis/moderation-labels.ts`). A legacy 3-class model (`valid` / `question` / `invalid`)
+  is still accepted; its `category` is `question` or `null`. Rule violations store `category: null`. There is no
+  prompt, so the comment cannot carry instructions.
 - `stub`: marks every comment that passes the rules as valid. Allowed only when `APP_ENV` is `local`, `test` or
   `development`; the API refuses to start otherwise.
 
@@ -190,12 +195,12 @@ docker run --rm -p 8080:8080 -v "$PWD/apps/ai/training/outputs/chinese-roberta-v
   ghcr.io/huggingface/text-embeddings-inference:cpu-1.8 --model-id /model --port 8080 --auto-truncate
 ```
 
-`GET /api/v1/health` reports `ai_service` as healthy when TEI serves a classifier with exactly the three moderation
-labels (or always, with the stub).
+`GET /api/v1/health` reports `ai_service` as healthy when TEI serves a classifier with exactly the two-head outputs
+or the legacy three moderation labels (or always, with the stub).
 
 ## Classifier fine-tuning (offline)
 
-`acms_ai.training` fine-tunes `hfl/chinese-roberta-wwm-ext` as a 3-class classifier on labeled JSONL exports,
+`acms_ai.training` fine-tunes `hfl/chinese-roberta-wwm-ext` with a label head and a category head on labeled JSONL exports,
 tunes thresholds on the validation split and evaluates once on a held-out test split. A 4 GB GPU is enough.
 It runs on a training machine, not in the production containers; its `model/` folder is then served by TEI.
 See [`apps/ai/training/README.md`](apps/ai/training/README.md).

@@ -7,7 +7,7 @@ import type { Env } from '../../config/env.js';
 const PREDICT_PATH = '/predict';
 const INFO_PATH = '/info';
 
-export interface TeiLabelScore {
+export interface TeiOutputScore {
   label: string;
   score: number;
 }
@@ -21,14 +21,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isLabelScore(value: unknown): value is TeiLabelScore {
+function isOutputScore(value: unknown): value is TeiOutputScore {
   return isRecord(value) && typeof value['label'] === 'string' && typeof value['score'] === 'number';
 }
 
-function parseLabelScores(payload: unknown): TeiLabelScore[] | null {
+function parseOutputScores(payload: unknown): TeiOutputScore[] | null {
   if (!Array.isArray(payload)) return null;
   const scores: unknown[] = Array.isArray(payload[0]) ? (payload[0] as unknown[]) : payload;
-  return scores.length > 0 && scores.every(isLabelScore) ? scores : null;
+  return scores.length > 0 && scores.every(isOutputScore) ? scores : null;
 }
 
 function parseClassifierInfo(payload: unknown): TeiClassifierInfo | null {
@@ -56,9 +56,9 @@ export class TeiClient {
     this.timeoutMs = config.get('TEI_TIMEOUT_MS', { infer: true });
   }
 
-  async predict(text: string): Promise<TeiLabelScore[]> {
-    const payload = await this.send('POST', PREDICT_PATH, { inputs: text, truncate: true, raw_scores: false }, this.timeoutMs);
-    const scores = parseLabelScores(payload);
+  async predictLogits(text: string): Promise<TeiOutputScore[]> {
+    const payload = await this.send('POST', PREDICT_PATH, { inputs: text, truncate: true, raw_scores: true }, this.timeoutMs);
+    const scores = parseOutputScores(payload);
     if (!scores) {
       this.logger.warn('TEI returned a prediction without label scores');
       throw new ServiceUnavailableException('AI model returned an invalid response');

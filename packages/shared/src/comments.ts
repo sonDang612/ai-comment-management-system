@@ -1,5 +1,21 @@
 export const COMMENT_CONTENT_MAX_LENGTH = 10_000;
 
+export const COMMENT_CATEGORIES = [
+  'statement',
+  'question',
+  'off_topic',
+  'toxic',
+  'sexual',
+  'spam',
+  'gibberish',
+  'advertisement',
+  'scam',
+  'privacy',
+  'illegal',
+  'political',
+] as const;
+export type CommentCategory = (typeof COMMENT_CATEGORIES)[number];
+
 export interface CreateCommentRequest {
   content: string;
 }
@@ -9,6 +25,7 @@ export interface CommentDto {
   content: string;
   is_valid: boolean | null;
   is_question: boolean | null;
+  category: CommentCategory | null;
   confidence: number | null;
   reason: string | null;
   moderated_at: string | null;
@@ -43,6 +60,7 @@ export interface AiCommentAnalysisRequest {
 export interface AiCommentAnalysis {
   is_valid: boolean;
   is_question: boolean;
+  category: CommentCategory | null;
   confidence: number;
   reason: string;
 }

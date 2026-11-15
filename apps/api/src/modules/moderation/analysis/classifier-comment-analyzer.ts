@@ -3,7 +3,13 @@ import type { AiCommentAnalysis, AiCommentAnalysisRequest } from '@acms/shared';
 import { ServiceUnavailableException } from '../../../common/errors/app.exception.js';
 import type { TeiClient } from '../../../infrastructure/tei/tei.client.js';
 import type { CommentAnalyzer } from './comment-analyzer.js';
-import { hasExactlyModerationLabels, MAX_INPUT_CHARS, toCommentAnalysis, topPrediction } from './moderation-labels.js';
+import {
+  isTwoHeadModel,
+  MAX_INPUT_CHARS,
+  predictFromLogits,
+  servesModerationOutputs,
+  toCommentAnalysis,
+} from './moderation-labels.js';
 
 export class ClassifierCommentAnalyzer implements CommentAnalyzer {
   readonly name = 'classifier';
@@ -13,19 +19,20 @@ export class ClassifierCommentAnalyzer implements CommentAnalyzer {
 
   async analyze(request: AiCommentAnalysisRequest): Promise<AiCommentAnalysis> {
     const input = Array.from(request.content).slice(0, MAX_INPUT_CHARS).join('');
-    const prediction = topPrediction(await this.tei.predict(input));
+    const prediction = predictFromLogits(await this.tei.predictLogits(input));
     if (!prediction) {
       this.logger.warn(`Invalid classifier scores for comment ${request.comment_id}`);
-      throw new ServiceUnavailableException('AI model returned invalid label scores');
+      throw new ServiceUnavailableException('AI model returned invalid scores');
     }
     return toCommentAnalysis(prediction);
   }
 
   async health(timeoutMs: number): Promise<Record<string, unknown>> {
     const info = await this.tei.classifierInfo(timeoutMs);
-    if (!hasExactlyModerationLabels(info.labels)) {
-      throw new Error(`Model ${info.modelId} does not serve the moderation labels`);
+    if (!servesModerationOutputs(info.labels)) {
+      throw new Error(`Model ${info.modelId} does not serve the moderation outputs`);
     }
-    return { analyzer: this.name, model: info.modelId, labels: info.labels };
+    const format = isTwoHeadModel(info.labels) ? 'label+category' : 'legacy';
+    return { analyzer: this.name, model: info.modelId, format, labels: info.labels };
   }
 }

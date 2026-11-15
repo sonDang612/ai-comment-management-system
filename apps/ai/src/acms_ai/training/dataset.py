@@ -5,10 +5,10 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from acms_ai.training.errors import TrainingDataError
-from acms_ai.training.labels import ModerationLabel, label_from_flags
+from acms_ai.training.labels import CommentCategory, ModerationLabel
 
 logger = logging.getLogger(__name__)
 
@@ -34,21 +34,7 @@ class LabeledComment(BaseModel):
     site_code: str | None = Field(default=None, max_length=64)
     content: str = Field(min_length=1, max_length=MAX_CONTENT_LENGTH)
     label: ModerationLabel
-    reason: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def derive_label_from_flags(cls, data: Any) -> Any:
-        if not isinstance(data, dict) or "is_valid" not in data:
-            return data
-        is_valid = data["is_valid"]
-        is_question = data.get("is_question", False)
-        if not isinstance(is_valid, bool) or not isinstance(is_question, bool):
-            raise ValueError("is_valid and is_question must be booleans")
-        derived = label_from_flags(is_valid, is_question)
-        if data.get("label") not in (None, derived.value):
-            raise ValueError(f"label {data['label']!r} contradicts is_valid/is_question")
-        return {**data, "label": derived}
+    category: CommentCategory
 
     @property
     def content_key(self) -> str:
@@ -59,6 +45,10 @@ class LabeledComment(BaseModel):
         if self.comment_id is None:
             return None
         return f"{self.site_code or ''}:{self.comment_id}"
+
+    @property
+    def targets(self) -> tuple[ModerationLabel, CommentCategory]:
+        return self.label, self.category
 
 
 def load_jsonl(path: Path, *, skip_invalid: bool = False) -> list[LabeledComment]:

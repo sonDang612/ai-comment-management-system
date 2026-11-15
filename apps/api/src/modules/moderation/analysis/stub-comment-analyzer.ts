@@ -7,7 +7,7 @@ export class StubCommentAnalyzer implements CommentAnalyzer {
   readonly name = 'stub';
 
   analyze(): Promise<AiCommentAnalysis> {
-    return Promise.resolve({ is_valid: true, is_question: false, confidence: 1, reason: STUB_REASON });
+    return Promise.resolve({ is_valid: true, is_question: false, category: null, confidence: 1, reason: STUB_REASON });
   }
 
   health(): Promise<Record<string, unknown>> {

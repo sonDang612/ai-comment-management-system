@@ -11,6 +11,7 @@ import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { useTableBodyHeight } from "@/lib/use-table-body-height";
 import { useComments } from "../api";
 import { type CommentValidityFilter, useCommentsUiStore } from "../store";
+import { CategoryTag } from "./category-tag";
 import { CheckResultTag } from "./check-result-tag";
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -116,6 +117,12 @@ export function CommentTable() {
         ),
     },
     {
+      key: "category",
+      title: t.columns.category,
+      width: 130,
+      render: (_, row) => (isSkeletonRow(row) ? tagSkeleton : <CategoryTag category={row.category} />),
+    },
+    {
       key: "confidence",
       title: t.columns.confidence,
       width: 130,
@@ -215,7 +222,7 @@ export function CommentTable() {
           columns={columns}
           dataSource={isLoadingRows ? SKELETON_ROWS : (data?.items ?? [])}
           locale={{ emptyText: t.empty }}
-          scroll={{ x: 900, y: tableBodyHeight }}
+          scroll={{ x: 1030, y: tableBodyHeight }}
           pagination={{
             current: page,
             pageSize,

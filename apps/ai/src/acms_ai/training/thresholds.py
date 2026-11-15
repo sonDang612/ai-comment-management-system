@@ -4,9 +4,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from acms_ai.training.config import EvaluationSettings
-from acms_ai.training.labels import ModerationLabel
+from acms_ai.training.dataset import LabeledComment
+from acms_ai.training.labels import ModerationLabel, is_question
 from acms_ai.training.metrics import safe_ratio
-from acms_ai.training.scoring import LabelScores
+from acms_ai.training.scoring import CommentScores
 
 PolicyOutcome = Literal["accepted", "question_review", "uncertain"]
 THRESHOLD_DECIMALS = 4
@@ -26,38 +27,45 @@ class Thresholds(BaseModel):
         return self.valid if label == ModerationLabel.VALID else self.invalid
 
 
-def policy_outcome(score: LabelScores, thresholds: Thresholds) -> PolicyOutcome:
-    if score.predicted == ModerationLabel.QUESTION:
+def policy_outcome(score: CommentScores, thresholds: Thresholds) -> PolicyOutcome:
+    if score.is_question:
         return "question_review"
     if score.confidence >= thresholds.for_label(score.predicted):
         return "accepted"
     return "uncertain"
 
 
+def gold_is_question(record: LabeledComment) -> bool:
+    return is_question(record.label, record.category)
+
+
 def class_acceptance(
-    gold: Sequence[ModerationLabel],
-    scores: Sequence[LabelScores],
+    records: Sequence[LabeledComment],
+    scores: Sequence[CommentScores],
     label: ModerationLabel,
     threshold: float,
 ) -> dict[str, float]:
     accepted = [
-        expected
-        for expected, score in zip(gold, scores, strict=True)
-        if score.predicted == label and score.confidence >= threshold
+        record
+        for record, score in zip(records, scores, strict=True)
+        if not score.is_question and score.predicted == label and score.confidence >= threshold
     ]
-    correct = sum(1 for expected in accepted if expected == label)
+    correct = sum(1 for record in accepted if record.label == label)
+    relevant = sum(
+        1 for record in records if record.label == label and not gold_is_question(record)
+    )
     return {
         "threshold": threshold,
         "accepted": len(accepted),
         "correct": correct,
         "precision": safe_ratio(correct, len(accepted)),
-        "recall": safe_ratio(correct, sum(1 for expected in gold if expected == label)),
-        "coverage": safe_ratio(len(accepted), len(gold)),
+        "recall": safe_ratio(correct, relevant),
+        "coverage": safe_ratio(len(accepted), len(records)),
     }
 
 
 def policy_metrics(
-    gold: Sequence[ModerationLabel], scores: Sequence[LabelScores], thresholds: Thresholds
+    records: Sequence[LabeledComment], scores: Sequence[CommentScores], thresholds: Thresholds
 ) -> dict[str, Any]:
     outcomes = [policy_outcome(score, thresholds) for score in scores]
     question_reviews = outcomes.count("question_review")
@@ -65,8 +73,8 @@ def policy_metrics(
     return {
         "thresholds": thresholds.model_dump(),
         "per_class": {
-            label.value: class_acceptance(gold, scores, label, thresholds.for_label(label))
-            for label in (ModerationLabel.VALID, ModerationLabel.INVALID)
+            label.value: class_acceptance(records, scores, label, thresholds.for_label(label))
+            for label in ModerationLabel
         },
         "question_reviews": question_reviews,
         "uncertain": uncertain,
@@ -83,7 +91,9 @@ def threshold_grid(settings: EvaluationSettings) -> list[float]:
 
 
 def tune_thresholds(
-    gold: Sequence[ModerationLabel], scores: Sequence[LabelScores], settings: EvaluationSettings
+    records: Sequence[LabeledComment],
+    scores: Sequence[CommentScores],
+    settings: EvaluationSettings,
 ) -> tuple[Thresholds, dict[str, Any]]:
     targets = {
         ModerationLabel.VALID: (settings.valid_target_precision, settings.default_valid_threshold),
@@ -95,7 +105,7 @@ def tune_thresholds(
     chosen: dict[str, float] = {}
     tuning: dict[str, Any] = {}
     for label, (target_precision, default_threshold) in targets.items():
-        curve = [class_acceptance(gold, scores, label, t) for t in threshold_grid(settings)]
+        curve = [class_acceptance(records, scores, label, t) for t in threshold_grid(settings)]
         meeting = [
             point
             for point in curve

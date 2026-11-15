@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 from acms_ai.training.artifacts import file_sha256, read_json, utc_timestamp, write_json
 from acms_ai.training.dataset import LabeledComment, load_jsonl, write_jsonl
 from acms_ai.training.errors import ArtifactMismatchError, DataLeakageError, TrainingConfigError
-from acms_ai.training.labels import LABELS
+from acms_ai.training.labels import CATEGORIES, LABELS
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def deduplicate(records: Sequence[LabeledComment]) -> tuple[list[LabeledComment]
     conflicting_identities = {
         identity
         for identity, group in by_identity.items()
-        if len({(item.content_key, item.label) for item in group}) > 1
+        if len({(item.content_key, item.targets) for item in group}) > 1
     }
 
     by_content: dict[str, list[LabeledComment]] = defaultdict(list)
@@ -54,7 +54,7 @@ def deduplicate(records: Sequence[LabeledComment]) -> tuple[list[LabeledComment]
     unique: list[LabeledComment] = []
     conflicting_content_records = 0
     for group in by_content.values():
-        if len({item.label for item in group}) > 1:
+        if len({item.targets for item in group}) > 1:
             conflicting_content_records += len(group)
             continue
         unique.append(group[0])
@@ -78,9 +78,9 @@ def assign_splits(
 ) -> dict[SplitName, list[LabeledComment]]:
     rng = random.Random(seed)
     splits: dict[SplitName, list[LabeledComment]] = {name: [] for name in SPLIT_NAMES}
-    for label in LABELS:
+    for targets in sorted({record.targets for record in records}):
         stratum = sorted(
-            (record for record in records if record.label == label),
+            (record for record in records if record.targets == targets),
             key=lambda record: record.content_key,
         )
         rng.shuffle(stratum)
@@ -120,9 +120,13 @@ def assert_no_leakage(splits: Mapping[str, Sequence[LabeledComment]]) -> None:
         raise DataLeakageError(details=leaks)
 
 
-def label_counts(records: Sequence[LabeledComment]) -> dict[str, int]:
-    counts = Counter(record.label.value for record in records)
-    return {label.value: counts.get(label.value, 0) for label in LABELS}
+def label_counts(records: Sequence[LabeledComment]) -> dict[str, dict[str, int]]:
+    labels = Counter(record.label for record in records)
+    categories = Counter(record.category for record in records)
+    return {
+        "label": {label.value: labels.get(label, 0) for label in LABELS},
+        "category": {category.value: categories.get(category, 0) for category in CATEGORIES},
+    }
 
 
 def create_splits(

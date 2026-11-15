@@ -3,24 +3,42 @@ from enum import StrEnum
 
 class ModerationLabel(StrEnum):
     VALID = "valid"
-    QUESTION = "question"
     INVALID = "invalid"
 
 
+class CommentCategory(StrEnum):
+    STATEMENT = "statement"
+    QUESTION = "question"
+    OFF_TOPIC = "off_topic"
+    TOXIC = "toxic"
+    SEXUAL = "sexual"
+    SPAM = "spam"
+    GIBBERISH = "gibberish"
+    ADVERTISEMENT = "advertisement"
+    SCAM = "scam"
+    PRIVACY = "privacy"
+    ILLEGAL = "illegal"
+    POLITICAL = "political"
+
+
 LABELS: tuple[ModerationLabel, ...] = tuple(ModerationLabel)
+CATEGORIES: tuple[CommentCategory, ...] = tuple(CommentCategory)
 
-DEFAULT_REASONS: dict[ModerationLabel, str] = {
-    ModerationLabel.VALID: "评论内容正常,未发现违规",
-    ModerationLabel.QUESTION: "用户向网站运营方提问,需要人工回复",
-    ModerationLabel.INVALID: "评论内容违规",
-}
-
-
-def label_from_flags(is_valid: bool, is_question: bool) -> ModerationLabel:
-    if not is_valid:
-        return ModerationLabel.INVALID
-    return ModerationLabel.QUESTION if is_question else ModerationLabel.VALID
+LABEL_HEAD = "label"
+CATEGORY_HEAD = "category"
+HEAD_SEPARATOR = ":"
 
 
-def flags_from_label(label: ModerationLabel) -> tuple[bool, bool]:
-    return label != ModerationLabel.INVALID, label == ModerationLabel.QUESTION
+def output_name(head: str, value: str) -> str:
+    return f"{head}{HEAD_SEPARATOR}{value}"
+
+
+OUTPUT_NAMES: tuple[str, ...] = tuple(output_name(LABEL_HEAD, label) for label in LABELS) + tuple(
+    output_name(CATEGORY_HEAD, category) for category in CATEGORIES
+)
+LABEL_SLICE = slice(0, len(LABELS))
+CATEGORY_SLICE = slice(len(LABELS), len(LABELS) + len(CATEGORIES))
+
+
+def is_question(label: ModerationLabel, category: CommentCategory) -> bool:
+    return label == ModerationLabel.VALID and category == CommentCategory.QUESTION

@@ -1,7 +1,7 @@
 # Classifier fine-tuning: hfl/chinese-roberta-wwm-ext comment moderation
 
-Offline pipeline that fine-tunes **`hfl/chinese-roberta-wwm-ext`** (BERT, about 102M parameters) as a 3-class
-sequence classifier (`valid` / `question` / `invalid`), tunes the decision thresholds on the validation split, and
+Offline pipeline that fine-tunes **`hfl/chinese-roberta-wwm-ext`** (BERT, about 102M parameters) with two
+independent output heads on a shared encoder (label `valid` / `invalid`, and a comment category), tunes the decision thresholds on the validation split, and
 measures the result once on an untouched test split. It trains on a 4 GB GPU (for example a GTX 1650 Ti, fp16).
 
 It is an offline entrypoint of `apps/ai` (`python -m acms_ai.training`), next to the queue worker. It imports
@@ -51,27 +51,39 @@ GPUs without bf16 (for example Turing, GTX 16xx / RTX 20xx) use fp16 automatical
 One JSON object per line (UTF-8). Unknown fields are ignored.
 
 ```jsonl
-{"comment_id": "10001", "site_code": "taolun666", "content": "今晚买几号?", "is_valid": true, "is_question": false}
-{"comment_id": "10002", "site_code": "taolun666", "content": "特码是什么意思?", "is_valid": true, "is_question": true}
-{"comment_id": "10003", "site_code": "taolun666", "content": "加我V信 abc123 包中", "is_valid": false, "is_question": false, "reason": "包含联系方式和广告"}
-{"comment_id": "10004", "content": "又没中", "label": "valid"}
+{"comment_id": "10001", "site_code": "taolun666", "content": "今晚买几号?", "label": "valid", "category": "statement"}
+{"comment_id": "10002", "site_code": "taolun666", "content": "特码是什么意思?", "label": "valid", "category": "question"}
+{"comment_id": "10003", "site_code": "taolun666", "content": "加我V信 abc123 包中", "label": "invalid", "category": "privacy"}
 ```
 
-| Field                        | Required | Notes                                                                                         |
-| ---------------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| `content`                    | yes      | Raw comment text, as the API sends it to the AI (max 10 000 characters)                       |
-| `is_valid` + `is_question`   | one of   | Same fields the system stores. `is_valid: false` wins over `is_question` (violation first)    |
-| `label`                      | one of   | `valid`, `question` or `invalid`. If given with the flags, both must agree                    |
-| `comment_id`, `site_code`    | no       | Used to detect duplicates and leakage, and copied into prediction files                       |
-| `reason`                     | no       | Ignored by the classifier: the API returns a fixed Simplified Chinese reason per label        |
+| Field                     | Required | Notes                                                                                 |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `content`                 | yes      | Raw comment text, as the API sends it to the AI (max 10 000 characters)               |
+| `label`                   | yes      | `valid` (approved) or `invalid` (not approved). Target of the label head              |
+| `category`                | yes      | One category below. Target of the category head                                       |
+| `comment_id`, `site_code` | no       | Used to detect duplicates and leakage, and copied into prediction files               |
 
-The model learns three classes, which map back to the system fields:
+`label` and `category` are two **independent** targets: neither is derived from the other, and both are given in
+every record. Categories (`acms_ai.training.labels.CommentCategory`, mirrored by `COMMENT_CATEGORIES` in
+`packages/shared`):
 
-| Label      | `is_valid` | `is_question` |
-| ---------- | ---------- | ------------- |
-| `valid`    | `true`     | `false`       |
-| `question` | `true`     | `true`        |
-| `invalid`  | `false`    | `false`       |
+| Category        | Usually with | Meaning                                                   |
+| --------------- | ------------ | --------------------------------------------------------- |
+| `statement`     | `valid`      | Normal comment                                            |
+| `question`      | `valid`      | Question to the site operator (needs a human reply)       |
+| `off_topic`     | `valid`      | Everyday chat unrelated to the topic                      |
+| `toxic`         | `invalid`    | Insult, profanity, harassment, hate, threat, violence, self-harm |
+| `sexual`        | `invalid`    | Sexual or vulgar content                                  |
+| `spam`          | `invalid`    | Flooding or repeated filler                               |
+| `gibberish`     | `invalid`    | Random characters, meaningless text                       |
+| `advertisement` | `invalid`    | Advertising, promotion, gambling referrals                |
+| `scam`          | `invalid`    | Scam or phishing                                          |
+| `privacy`       | `invalid`    | Contact details or personal data                          |
+| `illegal`       | `invalid`    | Illegal goods: drugs, weapons, …                          |
+| `political`     | `invalid`    | Sensitive political content                               |
+
+The system fields map from the two heads: `is_valid = label == valid`, `is_question = is_valid and category ==
+question`, plus `category` itself.
 
 Do not put passwords, IPs or other personal data in the files (docs 5.3.1). Prediction files keep only
 `comment_id`, `site_code`, labels and scores, never the content.
@@ -128,9 +140,12 @@ How it works:
 
 - Only `train.jsonl` is used for gradient updates. `validation.jsonl` is scored every `eval_steps`; the checkpoint
   with the best macro F1 is kept, and early stopping uses the same metric. `test.jsonl` is never loaded for training.
-- The whole model is fine-tuned with a new 3-label head (`id2label` = `valid`, `question`, `invalid`) and
-  cross-entropy loss. There is no prompt: the comment text is the only input, truncated to `max_seq_length` tokens,
-  so instructions inside a comment cannot change the task.
+- The whole model is fine-tuned with two new heads on the shared encoder, stored as one classification layer so
+  that TEI serves it as a standard model: `id2label` = `label:valid`, `label:invalid`, then `category:<name>` for
+  every category. The loss is the cross-entropy of the label head plus the cross-entropy of the category head, each
+  with its own softmax, so the heads are trained independently. The best checkpoint maximizes the mean of both
+  macro F1 scores on validation. There is no prompt: the comment text is the only input, truncated to
+  `max_seq_length` tokens, so instructions inside a comment cannot change the task.
 - The result is a standard Hugging Face folder (`config.json`, `model.safetensors`, `tokenizer.json` …) that TEI
   serves as is. The base model download stays in the Hugging Face cache (or `cache_dir`).
 
@@ -177,7 +192,7 @@ python -m acms_ai.training evaluate --run-dir training/outputs/chinese-roberta-v
 
 The report (printed, and saved to `evaluation/<split>_report.json`) contains:
 
-- **Classification** over the three labels: accuracy, per-class precision / recall / F1 / support, macro and
+- **Classification** per head (`label` and `category`): accuracy, per-class precision / recall / F1 / support, macro and
   weighted F1, and the confusion matrix (rows = gold, columns = predicted).
 - **Binary views**: `is_invalid` and `is_question` with TP / FP / FN / TN, precision, recall, F1 and accuracy.
 - **Threshold policy**: for `valid` and `invalid`, the comments accepted at the threshold with their precision,

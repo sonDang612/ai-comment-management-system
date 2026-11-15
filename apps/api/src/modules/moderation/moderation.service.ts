@@ -19,6 +19,7 @@ function ruleViolationResult(violations: RuleViolation[]): AiCommentAnalysis {
   return {
     is_valid: false,
     is_question: false,
+    category: null,
     confidence: RULE_MATCH_CONFIDENCE,
     reason: violations.map((violation) => violation.reason).join(REASON_SEPARATOR),
   };
@@ -75,6 +76,7 @@ export class ModerationService {
       data: {
         isValid: result.is_valid,
         isQuestion: result.is_question,
+        category: result.category,
         confidence: result.confidence,
         reason: result.reason,
         moderatedAt: new Date(),

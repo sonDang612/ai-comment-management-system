@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 from acms_ai.training.config import ModelSettings, ResolvedPrecision
-from acms_ai.training.labels import LABELS
+from acms_ai.training.labels import OUTPUT_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def hub_kwargs(settings: ModelSettings) -> dict[str, Any]:
 
 
 def label_mappings() -> tuple[dict[int, str], dict[str, int]]:
-    id2label = {index: label.value for index, label in enumerate(LABELS)}
+    id2label = dict(enumerate(OUTPUT_NAMES))
     return id2label, {name: index for index, name in id2label.items()}
 
 
@@ -42,13 +42,17 @@ def load_base_classifier(settings: ModelSettings) -> Any:
     id2label, label2id = label_mappings()
     model = AutoModelForSequenceClassification.from_pretrained(
         settings.base_model,
-        num_labels=len(LABELS),
+        num_labels=len(OUTPUT_NAMES),
         id2label=id2label,
         label2id=label2id,
         problem_type="single_label_classification",
         **hub_kwargs(settings),
     )
-    logger.info("Loaded base model %s with a new %d-label head", settings.base_model, len(LABELS))
+    logger.info(
+        "Loaded base model %s with new label and category heads (%d outputs)",
+        settings.base_model,
+        len(OUTPUT_NAMES),
+    )
     return model
 
 

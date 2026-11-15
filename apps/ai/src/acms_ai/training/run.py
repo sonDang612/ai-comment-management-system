@@ -6,7 +6,7 @@ from typing import Any
 from acms_ai.training.artifacts import directory_sha256, read_json
 from acms_ai.training.config import FineTuneConfig, config_from_dict
 from acms_ai.training.errors import ArtifactMismatchError, TrainingConfigError
-from acms_ai.training.labels import LABELS
+from acms_ai.training.labels import OUTPUT_NAMES
 from acms_ai.training.splitting import SplitDirectory
 
 MODEL_DIR = "model"
@@ -48,11 +48,11 @@ class RunDirectory:
 
     def load_config(self, evaluation_overrides: Mapping[str, Any]) -> FineTuneConfig:
         record = self.training_record
-        current_labels = [label.value for label in LABELS]
-        if record["labels"] != current_labels:
+        current_labels = list(OUTPUT_NAMES)
+        if record.get("outputs") != current_labels:
             raise ArtifactMismatchError(
                 "The model was trained with other labels",
-                details={"trained": record["labels"], "current": current_labels},
+                details={"trained": record.get("outputs"), "current": current_labels},
             )
         overrides = {f"evaluation.{key}": value for key, value in evaluation_overrides.items()}
         return config_from_dict(record["config"], overrides)

@@ -4,6 +4,7 @@ import { Descriptions, type DescriptionsProps, Modal, Typography } from "antd";
 import { useI18n } from "@/i18n";
 import { formatDateTime } from "@/lib/datetime";
 import { useCommentsUiStore } from "../store";
+import { CategoryTag } from "./category-tag";
 import { CheckResultTag } from "./check-result-tag";
 
 const CONFIDENCE_FRACTION_DIGITS = 2;
@@ -50,6 +51,11 @@ export function CommentDetailModal() {
               falseColor="default"
             />
           ),
+        },
+        {
+          key: "category",
+          label: t.columns.category,
+          children: <CategoryTag category={comment.category} />,
         },
         {
           key: "confidence",

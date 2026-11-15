@@ -7,7 +7,7 @@ from acms_ai.training.artifacts import utc_timestamp, write_json
 from acms_ai.training.config import FineTuneConfig
 from acms_ai.training.dataset import LabeledComment
 from acms_ai.training.errors import TrainingConfigError
-from acms_ai.training.labels import LABELS
+from acms_ai.training.labels import CATEGORIES, CATEGORY_SLICE, LABEL_SLICE, LABELS, OUTPUT_NAMES
 from acms_ai.training.metrics import classification_metrics
 from acms_ai.training.model_loading import load_base_classifier, load_tokenizer, resolve_precision
 from acms_ai.training.run import RunDirectory
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 RECORDED_PACKAGES = ("torch", "transformers", "accelerate")
 BEST_MODEL_METRIC = "macro_f1"
+HEAD_COUNT = 2
 
 
 def package_versions() -> dict[str, str | None]:
@@ -49,21 +50,45 @@ def encode_records(
     tokenizer: Any, records: Sequence[LabeledComment], max_length: int
 ) -> list[dict[str, Any]]:
     label_ids = {label: index for index, label in enumerate(LABELS)}
+    category_ids = {category: index for index, category in enumerate(CATEGORIES)}
     encoded = tokenizer(
         [record.content for record in records], truncation=True, max_length=max_length
     )
     return [
-        {key: values[row] for key, values in encoded.items()} | {"labels": label_ids[record.label]}
+        {key: values[row] for key, values in encoded.items()}
+        | {"labels": [label_ids[record.label], category_ids[record.category]]}
         for row, record in enumerate(records)
     ]
 
 
-def macro_f1_metrics(prediction: Any) -> dict[str, float]:
-    predicted_ids = prediction.predictions.argmax(axis=-1).tolist()
-    gold = [LABELS[index] for index in prediction.label_ids.tolist()]
-    predicted = [LABELS[index] for index in predicted_ids]
-    metrics = classification_metrics(gold, predicted, LABELS)
-    return {"accuracy": metrics["accuracy"], BEST_MODEL_METRIC: metrics["macro_f1"]}
+def two_head_loss(outputs: Any, labels: Any, num_items_in_batch: Any = None) -> Any:
+    from torch.nn.functional import cross_entropy
+
+    logits = outputs["logits"].float()
+    label_loss = cross_entropy(logits[:, LABEL_SLICE], labels[:, 0], reduction="sum")
+    category_loss = cross_entropy(logits[:, CATEGORY_SLICE], labels[:, 1], reduction="sum")
+    divisor = num_items_in_batch if num_items_in_batch is not None else labels.shape[0] * HEAD_COUNT
+    return (label_loss + category_loss) / divisor
+
+
+def head_metrics(prediction: Any) -> dict[str, float]:
+    logits = prediction.predictions
+    gold = prediction.label_ids
+    gold_labels = [LABELS[index] for index in gold[:, 0].tolist()]
+    gold_categories = [CATEGORIES[index] for index in gold[:, 1].tolist()]
+    predicted_labels = [LABELS[i] for i in logits[:, LABEL_SLICE].argmax(axis=-1).tolist()]
+    predicted_categories = [
+        CATEGORIES[i] for i in logits[:, CATEGORY_SLICE].argmax(axis=-1).tolist()
+    ]
+    label = classification_metrics(gold_labels, predicted_labels, LABELS)
+    category = classification_metrics(gold_categories, predicted_categories, CATEGORIES)
+    return {
+        "label_accuracy": label["accuracy"],
+        "label_macro_f1": label["macro_f1"],
+        "category_accuracy": category["accuracy"],
+        "category_macro_f1": category["macro_f1"],
+        BEST_MODEL_METRIC: (label["macro_f1"] + category["macro_f1"]) / HEAD_COUNT,
+    }
 
 
 def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) -> RunDirectory:
@@ -133,7 +158,8 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
         eval_dataset=validation_dataset,
         processing_class=tokenizer,
         data_collator=DataCollatorWithPadding(tokenizer),
-        compute_metrics=macro_f1_metrics,
+        compute_metrics=head_metrics,
+        compute_loss_func=two_head_loss,
         callbacks=callbacks,
     )
     train_result = trainer.train(resume_from_checkpoint=True if resume else None)
@@ -147,7 +173,7 @@ def train(config: FineTuneConfig, *, force: bool = False, resume: bool = False) 
             "created_at": utc_timestamp(),
             "config": config.model_dump(mode="json"),
             "precision": precision,
-            "labels": [label.value for label in LABELS],
+            "outputs": list(OUTPUT_NAMES),
             "base_model": {
                 "name": config.model.base_model,
                 "revision": config.model.revision,

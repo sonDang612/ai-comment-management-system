@@ -12,3 +12,7 @@
 .git
 docs
 out
+# Classifier training artifacts: datasets, base models and run outputs never go into an image
+apps/ai/training/data
+apps/ai/training/models
+apps/ai/training/outputs
